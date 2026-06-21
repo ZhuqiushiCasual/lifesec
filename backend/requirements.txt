@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+asyncmy
+pydantic
+python-multipart
+openai
+email-validator
