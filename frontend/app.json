@@ -17,7 +17,10 @@
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       },
-      "package": "com.lifesecretary.app"
+      "package": "com.lifesecretary.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -27,6 +30,12 @@
       "expo-image-picker",
       "expo-asset",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "05202abf-3538-445b-b115-18a5c32b213b"
+      }
+    },
+    "owner": "cyyyy123"
   }
 }
