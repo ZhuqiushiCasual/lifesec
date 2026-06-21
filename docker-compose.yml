@@ -4,9 +4,6 @@ services:
 
   api:
     build: ./backend
-    depends_on:
-      mysql:
-        condition: service_healthy
     environment:
       SECRET_KEY: change-me-in-production
     ports:
@@ -19,5 +16,4 @@ services:
     depends_on:
       - api
 
-volumes:
-  mysqldata:
+
