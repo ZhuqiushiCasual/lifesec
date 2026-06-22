@@ -1,4 +1,4 @@
-{
+  {
   "expo": {
     "name": "Life Secretary",
     "slug": "life-secretary",
@@ -34,7 +34,8 @@
     "extra": {
       "eas": {
         "projectId": "05202abf-3538-445b-b115-18a5c32b213b"
-      }
+      },
+      "apiUrl": "http://8.136.46.200:8000"
     },
     "owner": "cyyyy123"
   }
