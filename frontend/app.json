@@ -14,6 +14,7 @@
       "bundleIdentifier": "com.lifesecretary.app"
     },
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       },
