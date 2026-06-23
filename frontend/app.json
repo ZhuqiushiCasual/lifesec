@@ -14,7 +14,6 @@
       "bundleIdentifier": "com.lifesecretary.app"
     },
     "android": {
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       },
@@ -28,6 +27,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
       "expo-image-picker",
       "expo-asset",
       "expo-font"

@@ -6,7 +6,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as api from '../services/api';
+import { events as eventsApi, board as boardApi } from '../services/api';
 import { EventItem, TodayBoard } from '../types';
 import { useAppStore } from '../store';
 import { colors } from '../theme/colors';
@@ -23,8 +23,8 @@ export default function RecordScreen() {
   const insets = useSafeAreaInsets();
   const user = useAppStore((s) => s.user);
   const [input, setInput] = useState('');
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [board, setBoard] = useState<TodayBoard | null>(null);
+  const [eventList, setEventList] = useState<EventItem[]>([]);
+  const [todayBoard, setTodayBoard] = useState<TodayBoard | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -33,11 +33,11 @@ export default function RecordScreen() {
   const loadData = useCallback(async (p = 1) => {
     setLoading(true);
     try {
-      const [evRes, brRes] = await Promise.all([api.events.list(p), api.board.today()]);
-      if (p === 1) setEvents(evRes.data.items);
-      else setEvents((prev) => [...prev, ...evRes.data.items]);
+      const [evRes, brRes] = await Promise.all([eventsApi.list(p), boardApi.today()]);
+      if (p === 1) setEventList(evRes.data.items);
+      else setEventList((prev) => [...prev, ...evRes.data.items]);
       setPage(p);
-      setBoard(brRes.data);
+      setTodayBoard(brRes.data);
     } catch (_) {
     } finally {
       setLoading(false);
@@ -50,11 +50,12 @@ export default function RecordScreen() {
     if (!input.trim()) return;
     setSending(true);
     try {
-      await api.events.create({ content: input.trim() });
+      await eventsApi.create({ content: input.trim() });
       setInput('');
       loadData(1);
     } catch (err: any) {
-      Alert.alert('错误', err.response?.data?.detail || '发送失败');
+      const detail = err?.response?.data?.detail || err?.message || JSON.stringify(err);
+      Alert.alert('错误', detail);
     } finally {
       setSending(false);
     }
@@ -90,10 +91,10 @@ export default function RecordScreen() {
       <View style={styles.greetingRow}>
         <View style={styles.greetingLeft}>
           <Text style={styles.greetingWave}>
-            {board?.greeting || '下午好'} 🌿
+            {todayBoard?.greeting || '下午好'} 🌿
           </Text>
           <Text style={styles.greetingName}>Hi, {user.name || '用户'}</Text>
-          <Text style={styles.greetingDate}>{board?.date || ''}</Text>
+          <Text style={styles.greetingDate}>{todayBoard?.date || ''}</Text>
         </View>
         <TouchableOpacity style={styles.avatarBtn} onPress={() => setShowProfile(true)}>
           <View style={styles.avatar}>
@@ -102,11 +103,11 @@ export default function RecordScreen() {
         </TouchableOpacity>
       </View>
 
-      {board && board.latest_insights.length > 0 && (
+      {todayBoard && todayBoard.latest_insights.length > 0 && (
         <View style={styles.quickSection}>
           <Text style={styles.quickLabel}>📡 核心动态</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickScroll}>
-            {board.latest_insights.map((i) => (
+            {todayBoard.latest_insights.map((i) => (
               <TouchableOpacity key={i.id} style={styles.quickCard}>
                 <Text style={styles.quickCat}>
                   {CAT_ICONS[i.category] || '📌'} {i.category}
@@ -130,16 +131,16 @@ export default function RecordScreen() {
         </View>
       </View>
 
-      {board && (
+      {todayBoard && (
         <TouchableOpacity style={styles.summaryCard}>
           <View style={styles.summaryLeft}>
             <View style={styles.summaryIcon}>
               <Ionicons name="list" size={18} color={colors.primary} />
             </View>
             <View>
-              <Text style={styles.summaryTitle}>今日已记录 {board.today_event_count} 条</Text>
+              <Text style={styles.summaryTitle}>今日已记录 {todayBoard.today_event_count} 条</Text>
               <Text style={styles.summarySub}>
-                {board.recent_events.map((e) => e.type).filter((v, i, a) => a.indexOf(v) === i).join(' · ') || '暂无'}
+                {todayBoard.recent_events.map((e) => e.type).filter((v, i, a) => a.indexOf(v) === i).join(' · ') || '暂无'}
               </Text>
             </View>
           </View>
@@ -152,7 +153,7 @@ export default function RecordScreen() {
   return (
     <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <FlatList
-        data={events}
+        data={eventList}
         keyExtractor={(e) => e.id}
         renderItem={renderEvent}
         ListHeaderComponent={renderHeader}
