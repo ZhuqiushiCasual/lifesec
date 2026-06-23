@@ -27,7 +27,7 @@ class FinanceTxn(Base):
     account: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="账户（如 支付宝 / 微信）")
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="备注")
     voice_source: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否来自语音输入")
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, comment="交易发生时间")
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="交易发生时间")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="记录创建时间")
 
     user = relationship("User", back_populates="finance_txns")

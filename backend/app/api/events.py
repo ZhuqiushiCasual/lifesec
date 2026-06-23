@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -33,14 +34,15 @@ async def create_event(
         sentiment_score=parsed.get("sentiment_score"),
         tags=parsed.get("tags"),
     )
-    db.add(event)
-
-    if detect_finance_intent(parsed):
+    is_finance = detect_finance_intent(parsed, data.content)
+    if not is_finance:
+        db.add(event)
+    if is_finance:
         finance_data = await parse_finance(data.content)
         txn = FinanceTxn(
             user_id=user.id,
             type=finance_data.get("type", "expense"),
-            amount=finance_data.get("amount", 0),
+            amount=Decimal(finance_data.get("amount", 0)),
             currency=finance_data.get("currency", "CNY"),
             category=finance_data.get("category", "other"),
             counterparty=finance_data.get("counterparty"),
