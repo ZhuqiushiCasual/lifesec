@@ -1,19 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, Modal, ScrollView,
+  View, Text, TextInput, TouchableOpacity, ScrollView, RefreshControl, StyleSheet, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Modal,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { events as eventsApi, board as boardApi } from '../services/api';
-import { EventItem, TodayBoard } from '../types';
+import { TodayBoard } from '../types';
 import { useAppStore } from '../store';
 import { colors } from '../theme/colors';
-
-const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  dietary: 'fast-food', sport: 'fitness', health: 'medkit', mood: 'happy', invest: 'trending-up',
-};
 
 const CAT_ICONS: Record<string, string> = {
   ai: '🤖', finance: '📈', industry: '🏭',
@@ -23,20 +19,15 @@ export default function RecordScreen() {
   const insets = useSafeAreaInsets();
   const user = useAppStore((s) => s.user);
   const [input, setInput] = useState('');
-  const [eventList, setEventList] = useState<EventItem[]>([]);
   const [todayBoard, setTodayBoard] = useState<TodayBoard | null>(null);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
-  const loadData = useCallback(async (p = 1) => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [evRes, brRes] = await Promise.all([eventsApi.list(p), boardApi.today()]);
-      if (p === 1) setEventList(evRes.data.items);
-      else setEventList((prev) => [...prev, ...evRes.data.items]);
-      setPage(p);
+      const brRes = await boardApi.today();
       setTodayBoard(brRes.data);
     } catch (_) {
     } finally {
@@ -52,7 +43,7 @@ export default function RecordScreen() {
     try {
       await eventsApi.create({ content: input.trim() });
       setInput('');
-      loadData(1);
+      loadData();
     } catch (err: any) {
       const detail = err?.response?.data?.detail || err?.message || JSON.stringify(err);
       Alert.alert('错误', detail);
@@ -63,31 +54,18 @@ export default function RecordScreen() {
 
   const suggestions = [
     { label: '🍳 早餐', text: '早餐吃了' },
-    { label: '🤕 身体状态', text: '下午有点' },
+    { label: '😴 睡眠', text: '昨晚睡了' },
     { label: '🏃 运动', text: '晚上健身' },
     { label: '😊 情绪', text: '今天心情' },
   ];
 
-  const renderEvent = ({ item }: { item: EventItem }) => (
-    <View style={styles.eventCard}>
-      <View style={styles.eventHeader}>
-        <Ionicons name={TYPE_ICONS[item.type] || 'ellipse'} size={16} color={colors.primary} />
-        <Text style={styles.eventType}>{item.type}</Text>
-        <Text style={styles.eventTime}>
-          {new Date(item.recorded_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-        </Text>
-      </View>
-      <Text style={styles.eventContent}>{item.content}</Text>
-      {item.sentiment && (
-        <Text style={styles.sentiment}>
-          {item.sentiment === 'positive' ? '😊' : item.sentiment === 'negative' ? '😟' : '😐'} {item.sentiment}
-        </Text>
-      )}
-    </View>
-  );
-
-  const renderHeader = () => (
-    <View>
+  return (
+    <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} />}
+      >
       <View style={styles.greetingRow}>
         <View style={styles.greetingLeft}>
           <Text style={styles.greetingWave}>
@@ -139,31 +117,13 @@ export default function RecordScreen() {
             </View>
             <View>
               <Text style={styles.summaryTitle}>今日已记录 {todayBoard.today_event_count} 条</Text>
-              <Text style={styles.summarySub}>
-                {todayBoard.recent_events.map((e) => e.type).filter((v, i, a) => a.indexOf(v) === i).join(' · ') || '暂无'}
-              </Text>
+              <Text style={styles.summarySub}>{todayBoard.today_event_count === 0 ? '暂无' : '点击查看详情'}</Text>
             </View>
           </View>
           <Text style={styles.summaryArrow}>→</Text>
         </TouchableOpacity>
       )}
-    </View>
-  );
-
-  return (
-    <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <FlatList
-        data={eventList}
-        keyExtractor={(e) => e.id}
-        renderItem={renderEvent}
-        ListHeaderComponent={renderHeader}
-        contentContainerStyle={styles.list}
-        onRefresh={() => loadData(1)}
-        refreshing={loading && page === 1}
-        onEndReached={() => !loading && loadData(page + 1)}
-        onEndReachedThreshold={0.5}
-        ListEmptyComponent={!loading ? <Text style={styles.empty}>还没有记录</Text> : null}
-      />
+      </ScrollView>
 
       <View style={styles.inputBar}>
         <TouchableOpacity style={styles.addBtn}>
@@ -226,6 +186,7 @@ export default function RecordScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  scrollView: { flex: 1 },
   list: { paddingHorizontal: 20, paddingBottom: 80 },
 
   greetingRow: {
@@ -278,17 +239,6 @@ const styles = StyleSheet.create({
   summaryTitle: { fontSize: 13, color: colors.text, fontWeight: '500' },
   summarySub: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
   summaryArrow: { color: colors.textMuted },
-
-  eventCard: {
-    backgroundColor: colors.card, borderRadius: 14, padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  eventHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  eventType: { fontSize: 12, fontWeight: '600', color: colors.primary, textTransform: 'capitalize' },
-  eventTime: { fontSize: 11, color: colors.textMuted, marginLeft: 'auto' },
-  eventContent: { fontSize: 15, color: colors.text, lineHeight: 22 },
-  sentiment: { fontSize: 12, marginTop: 4, color: colors.textSecondary },
-  empty: { textAlign: 'center', color: colors.textMuted, marginTop: 40, fontSize: 14 },
 
   inputBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

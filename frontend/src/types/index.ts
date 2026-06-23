@@ -62,6 +62,29 @@ export interface Digest {
   created_at: string;
 }
 
+export interface WeeklyChart {
+  type: string;
+  title: string;
+  unit: string;
+  color: string;
+  data: number[];
+  summary: string;
+  target?: number;
+}
+
+export interface WeeklyTrendResponse {
+  week_start: string;
+  days: string[];
+  day_labels: string[];
+  charts: WeeklyChart[];
+  health_events: Array<{
+    id: string;
+    type: string;
+    content: string;
+    recorded_at: string;
+  }>;
+}
+
 export interface TodayBoard {
   greeting: string;
   date: string;

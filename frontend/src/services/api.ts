@@ -40,6 +40,12 @@ export const board = {
   today: () => api.get('/api/board/today'),
 };
 
+export const memory = {
+  weekly: () => api.get('/api/memory/weekly'),
+  trends: (days = 30) => api.get('/api/memory/trends', { params: { days } }),
+  review: (date: string) => api.get('/api/memory/review', { params: { date } }),
+};
+
 export const voice = {
   transcribe: (audioBase64: string, format = 'wav') =>
     api.post('/api/voice/transcribe', { audio_base64: audioBase64, format }),

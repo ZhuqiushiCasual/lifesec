@@ -6,15 +6,56 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as api from '../services/api';
-import { TodayBoard, Digest, FinanceTxn } from '../types';
+import { TodayBoard, Digest, FinanceTxn, WeeklyTrendResponse } from '../types';
 import { colors } from '../theme/colors';
+import LineChart from '../components/LineChart';
 
 const TYPE_ICONS: Record<string, string> = {
-  dietary: 'fast-food', sport: 'fitness', health: 'medkit', mood: 'happy', invest: 'trending-up', event: 'ellipse',
+  dietary: 'fast-food', sport: 'fitness', health: 'medkit', mood: 'happy', sleep: 'moon', event: 'calendar',
 };
 
-const CAT_EMOJIS: Record<string, string> = {
-  ai: '🤖', finance: '📈', industry: '🏭',
+const TYPE_EMOJI: Record<string, string> = {
+  dietary: '🍽️', sport: '🏃', health: '🏥', mood: '😊', sleep: '😴', event: '📝',
+};
+
+function accentFor(type: string): string {
+  switch (type) {
+    case 'sport': return colors.primary;
+    case 'dietary': return colors.accentWheat;
+    case 'health': return colors.accentCoral;
+    case 'mood': return colors.accentPeach;
+    case 'sleep': return colors.accentLavender;
+    case 'event': return colors.accentSky;
+    default: return colors.textMuted;
+  }
+}
+
+function BarChart({
+  data, labels, color, target,
+}: { data: number[]; labels: string[]; color: string; target?: number }) {
+  const maxVal = Math.max(...data, target || 0, 1);
+  return (
+    <View style={styles.barChart}>
+      {data.map((v, i) => (
+        <View key={i} style={styles.barCol}>
+          <View style={[styles.barFillDynamic, {
+            height: v > 0 ? Math.max((v / maxVal) * 50, 4) : 0,
+            backgroundColor: color,
+          }]} />
+          <Text style={styles.barLabel}>{labels[i]}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const COLOR_MAP: Record<string, string> = {
+  primary: colors.primary,
+  accentLavender: colors.accentLavender,
+  accentWheat: colors.accentWheat,
+  accentPeach: colors.accentPeach,
+  accentCoral: colors.accentCoral,
+  accentSky: colors.accentSky,
 };
 
 export default function SecretaryScreen() {
@@ -22,19 +63,22 @@ export default function SecretaryScreen() {
   const [board, setBoard] = useState<TodayBoard | null>(null);
   const [digest, setDigest] = useState<Digest | null>(null);
   const [txns, setTxns] = useState<FinanceTxn[]>([]);
+  const [weekly, setWeekly] = useState<WeeklyTrendResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
-      const [brRes, diRes, txRes] = await Promise.allSettled([
+      const [brRes, diRes, txRes, wkRes] = await Promise.allSettled([
         api.board.today(),
         api.digests.latest(),
         api.finance.listTxns(),
+        api.memory.weekly(),
       ]);
       if (brRes.status === 'fulfilled') setBoard(brRes.value.data);
       if (diRes.status === 'fulfilled') setDigest(diRes.value.data);
       if (txRes.status === 'fulfilled') setTxns(txRes.value.data.items);
+      if (wkRes.status === 'fulfilled') setWeekly(wkRes.value.data);
     } catch (_) {
     } finally {
       setLoading(false);
@@ -99,55 +143,113 @@ export default function SecretaryScreen() {
           <Text style={styles.emptyText}>还没有记录</Text>
         </View>
       ) : (
-        (board?.recent_events ?? []).map((e, i) => (
-          <View key={e.id || i} style={styles.timelineItem}>
-            <Text style={styles.tlTime}>
-              {new Date(e.recorded_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-            <View style={[styles.tlDot, { backgroundColor: e.type === 'sport' ? colors.primary : e.type === 'dietary' ? colors.accentWheat : e.type === 'health' ? colors.accentPeach : e.type === 'mood' ? colors.accentLavender : colors.textMuted }]} />
-            <View style={styles.tlBody}>
-              <Text style={styles.tlType}>{e.type}</Text>
-              <Text style={styles.tlText}>{e.content}</Text>
-            </View>
-          </View>
-        ))
+        <View style={styles.timelineWrap}>
+          {(board?.recent_events ?? []).map((e, i) => {
+            const isLast = i === (board?.recent_events ?? []).length - 1;
+            const accent = accentFor(e.type);
+            return (
+              <View key={e.id || i} style={[styles.tlRow, isLast && styles.tlRowLast]}>
+                <View style={styles.tlRailCol}>
+                  <View style={[styles.tlNode, { backgroundColor: accent }]} />
+                  {!isLast && <View style={[styles.tlRail, { backgroundColor: accent + '40' }]} />}
+                </View>
+                <View style={styles.tlContent}>
+                  <Text style={styles.tlTime}>
+                    {new Date(e.recorded_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                  <View style={[styles.tlCard, { borderLeftColor: accent }]}>
+                    <View style={styles.tlTypeRow}>
+                      <Text style={styles.tlTypeEmoji}>{TYPE_EMOJI[e.type] || '•'}</Text>
+                      <Text style={styles.tlType}>{e.type}</Text>
+                    </View>
+                    <Text style={styles.tlText} numberOfLines={3}>{e.content}</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      <View style={styles.secLabel}>
+        <Text style={styles.secLabelText}>本周健康记录</Text>
+        {weekly && <Text style={styles.secLabelSub}>{weekly.week_start.slice(5)} 起</Text>}
+      </View>
+      {(weekly?.health_events ?? []).length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>本周暂无健康记录</Text>
+        </View>
+      ) : (
+        <View style={styles.timelineWrap}>
+          {(weekly?.health_events ?? []).map((e, i) => {
+            const isLast = i === (weekly?.health_events ?? []).length - 1;
+            const accent = accentFor(e.type);
+            return (
+              <View key={e.id || i} style={[styles.tlRow, isLast && styles.tlRowLast]}>
+                <View style={styles.tlRailCol}>
+                  <View style={[styles.tlNode, { backgroundColor: accent }]} />
+                  {!isLast && <View style={[styles.tlRail, { backgroundColor: accent + '40' }]} />}
+                </View>
+                <View style={styles.tlContent}>
+                  <Text style={styles.tlTime}>
+                    {new Date(e.recorded_at).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}
+                    {'  '}
+                    {new Date(e.recorded_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                  <View style={[styles.tlCard, { borderLeftColor: accent }]}>
+                    <View style={styles.tlTypeRow}>
+                      <Text style={styles.tlTypeEmoji}>{TYPE_EMOJI[e.type] || '•'}</Text>
+                      <Text style={styles.tlType}>{e.type === 'sleep' ? '睡眠' : '健康'}</Text>
+                    </View>
+                    <Text style={styles.tlText} numberOfLines={3}>{e.content}</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
       )}
 
       <View style={styles.secLabel}>
         <Text style={styles.secLabelText}>本周趋势</Text>
+        {weekly && <Text style={styles.secLabelSub}>{weekly.week_start.slice(5)} 起</Text>}
       </View>
-      <View style={styles.trendCard}>
-        <View style={styles.trendHeader}>
-          <Text style={styles.trendTitle}>🏃 运动频率</Text>
-          <View style={styles.trendChangeUp}>
-            <Text style={styles.trendChangeText}>↑ 3 次</Text>
-          </View>
+      {(weekly?.charts ?? []).length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>本周暂无趋势数据</Text>
         </View>
-        <View style={styles.barChart}>
-          {['一', '二', '三', '四', '五', '六', '日'].map((d, i) => (
-            <View key={d} style={styles.barCol}>
-              <View style={[styles.barFill, { height: [20, 0, 20, 0, 20, 0, 0][i] }]} />
-              <Text style={styles.barLabel}>{d}</Text>
+      ) : (
+        (weekly?.charts ?? []).map((chart) => {
+          const lineColor = COLOR_MAP[chart.color] || colors.primary;
+          const labels = weekly?.day_labels ?? ['一','二','三','四','五','六','日'];
+          const renderLine = chart.type === 'sleep' || chart.type === 'mood';
+          return (
+            <View key={chart.type} style={styles.trendCard}>
+              <View style={styles.trendHeader}>
+                <Text style={styles.trendTitle}>{chart.title}</Text>
+                <View style={[styles.trendBadge, { backgroundColor: lineColor + '20' }]}>
+                  <Text style={[styles.trendBadgeText, { color: lineColor }]}>{chart.summary}</Text>
+                </View>
+              </View>
+              {renderLine ? (
+                <LineChart
+                  data={chart.data}
+                  labels={labels}
+                  color={lineColor}
+                  target={chart.target}
+                  unit={chart.unit}
+                  height={96}
+                />
+              ) : (
+                <BarChart data={chart.data} labels={labels} color={lineColor} target={chart.target} />
+              )}
+              {chart.target ? (
+                <Text style={styles.trendTarget}>目标 {chart.target}{chart.unit}</Text>
+              ) : null}
             </View>
-          ))}
-        </View>
-      </View>
-      <View style={styles.trendCard}>
-        <View style={styles.trendHeader}>
-          <Text style={styles.trendTitle}>😊 日均情绪</Text>
-          <View style={styles.trendChangeNeutral}>
-            <Text style={[styles.trendChangeText, { color: colors.textMuted }]}>→ 6.8</Text>
-          </View>
-        </View>
-        <View style={styles.barChart}>
-          {['一', '二', '三', '四', '五', '六', '日'].map((d, i) => (
-            <View key={d} style={styles.barCol}>
-              <View style={[styles.barFillPeach, { height: [55, 60, 45, 75, 65, 50, 70][i] }]} />
-              <Text style={styles.barLabel}>{d}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+          );
+        })
+      )}
 
       <View style={styles.secLabel}>
         <Text style={styles.secLabelText}>财务看板</Text>
@@ -299,16 +401,27 @@ const styles = StyleSheet.create({
 
   secLabel: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 20, marginTop: 16, marginBottom: 10 },
   secLabelText: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: colors.textMuted, fontWeight: '500' },
+  secLabelSub: { fontSize: 11, color: colors.textMuted },
 
-  timelineItem: {
-    flexDirection: 'row', gap: 12, paddingVertical: 12, paddingHorizontal: 20,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
+  timelineWrap: {
+    marginHorizontal: 20, marginBottom: 12, backgroundColor: colors.card,
+    borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border,
   },
-  tlTime: { fontSize: 11, color: colors.textMuted, minWidth: 40, paddingTop: 2 },
-  tlDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
-  tlBody: { flex: 1 },
-  tlType: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: colors.textMuted, marginBottom: 2 },
-  tlText: { fontSize: 13, color: colors.text, lineHeight: 18 },
+  tlRow: { flexDirection: 'row', minHeight: 56 },
+  tlRowLast: { minHeight: 0 },
+  tlRailCol: { width: 16, alignItems: 'center', marginRight: 10 },
+  tlNode: { width: 10, height: 10, borderRadius: 5, marginTop: 2, borderWidth: 2, borderColor: '#fff' },
+  tlRail: { flex: 1, width: 2, marginTop: 2, marginBottom: 6 },
+  tlContent: { flex: 1, paddingBottom: 14 },
+  tlTime: { fontSize: 10, color: colors.textMuted, marginBottom: 4, fontWeight: '500' },
+  tlCard: {
+    paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.headerBg,
+    borderRadius: 10, borderLeftWidth: 3,
+  },
+  tlTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+  tlTypeEmoji: { fontSize: 11 },
+  tlType: { fontSize: 9, textTransform: 'uppercase', letterSpacing: 1, color: colors.textMuted },
+  tlText: { fontSize: 12.5, color: colors.text, lineHeight: 17 },
   emptyCard: { backgroundColor: colors.card, borderRadius: 14, padding: 20, marginHorizontal: 20, alignItems: 'center' },
   emptyText: { color: colors.textMuted, fontSize: 13 },
 
@@ -318,14 +431,13 @@ const styles = StyleSheet.create({
   },
   trendHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   trendTitle: { fontSize: 13, color: colors.text, fontWeight: '500' },
-  trendChangeUp: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(138,171,138,0.12)' },
-  trendChangeNeutral: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.04)' },
-  trendChangeText: { fontSize: 12, fontWeight: '600', color: colors.primary },
+  trendBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  trendBadgeText: { fontSize: 12, fontWeight: '600' },
   barChart: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 64 },
   barCol: { flex: 1, alignItems: 'center', gap: 4 },
-  barFill: { width: '100%', borderRadius: 4, backgroundColor: colors.primary, minHeight: 4 },
-  barFillPeach: { width: '100%', borderRadius: 4, backgroundColor: colors.accentPeach, minHeight: 4 },
+  barFillDynamic: { width: '100%', borderRadius: 4 },
   barLabel: { fontSize: 10, color: colors.textMuted },
+  trendTarget: { fontSize: 10, color: colors.textMuted, marginTop: 8, textAlign: 'center' },
 
   financeCard: {
     backgroundColor: colors.card, borderRadius: 16, padding: 16,
