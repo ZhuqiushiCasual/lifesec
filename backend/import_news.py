@@ -35,7 +35,7 @@ RESEARCH_PROMPT = """使用anysearch研究今天的金融新闻和AI新闻，总
 3. 每条新闻包含: title、summary、impact(对用户的影响分析)、category(finance或tech)、topics(标签数组)、importance(1-5)、source_url、source_name、published_at
 example:每条新闻的 published_at 格式为: %Y-%m-%d %H:%M:%S
         [
-          {
+          {{
             
             "title": "OpenAI 发布 GPT-5.5-Cyber：AI 漏洞发现速度超越人类",
             "summary": "OpenAI ...",
@@ -46,7 +46,7 @@ example:每条新闻的 published_at 格式为: %Y-%m-%d %H:%M:%S
             "source_url": "https://...",
             "source_name": "Times Now",
             "published_at": "2026-06-23 08:49:00"
-          }
+          }}
         ]
 4. 分别输出为 ai_news_{today}.json 和 finance_news_{today}.json，保存到当前目录"""
 
