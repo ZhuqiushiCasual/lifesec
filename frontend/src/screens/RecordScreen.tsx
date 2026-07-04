@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView, RefreshControl, StyleSheet, Alert, ActivityIndicator,
   KeyboardAvoidingView, Platform, Modal,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { events as eventsApi, board as boardApi } from '../services/api';
@@ -23,6 +23,7 @@ export default function RecordScreen() {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const navigation = useNavigation<any>();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -86,7 +87,7 @@ export default function RecordScreen() {
           <Text style={styles.quickLabel}>📡 核心动态</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickScroll}>
             {todayBoard.latest_insights.map((i) => (
-              <TouchableOpacity key={i.id} style={styles.quickCard}>
+              <TouchableOpacity key={i.id} style={styles.quickCard} onPress={() => navigation.navigate('Insight')}>
                 <Text style={styles.quickCat}>
                   {CAT_ICONS[i.category] || '📌'} {i.category}
                 </Text>
@@ -110,7 +111,7 @@ export default function RecordScreen() {
       </View>
 
       {todayBoard && (
-        <TouchableOpacity style={styles.summaryCard}>
+        <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Secretary')}>
           <View style={styles.summaryLeft}>
             <View style={styles.summaryIcon}>
               <Ionicons name="list" size={18} color={colors.primary} />
@@ -126,9 +127,6 @@ export default function RecordScreen() {
       </ScrollView>
 
       <View style={styles.inputBar}>
-        <TouchableOpacity style={styles.addBtn}>
-          <Text style={styles.addBtnText}>+</Text>
-        </TouchableOpacity>
         <TextInput
           style={styles.input}
           placeholder="随便说说，我会帮你整理..."
@@ -138,9 +136,6 @@ export default function RecordScreen() {
           multiline
           maxLength={1000}
         />
-        <TouchableOpacity style={styles.voiceBtn}>
-          <Text style={styles.voiceBtnText}>🎤</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={styles.sendBtn} onPress={handleSend} disabled={sending || !input.trim()}>
           {sending ? (
             <ActivityIndicator color={colors.textWhite} size="small" />
@@ -247,19 +242,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.borderLight,
     marginHorizontal: 12, marginBottom: 8,
   },
-  addBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: colors.headerBg, borderWidth: 1, borderColor: colors.border,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  addBtnText: { fontSize: 18, color: colors.textSecondary },
   input: { flex: 1, fontSize: 14, color: colors.text, paddingVertical: 8, maxHeight: 80 },
-  voiceBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: colors.headerBg, borderWidth: 1, borderColor: colors.border,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  voiceBtnText: { fontSize: 16 },
   sendBtn: {
     width: 38, height: 38, borderRadius: 19,
     backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',

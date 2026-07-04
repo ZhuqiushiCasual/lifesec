@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as api from '../services/api';
@@ -30,7 +31,11 @@ export default function InsightScreen() {
   useFocusEffect(useCallback(() => { loadInsights(); }, [loadInsights]));
 
   const renderItem = ({ item }: { item: Insight }) => (
-    <View style={[styles.card, item.importance && item.importance >= 4 ? styles.cardImportant : null]}>
+    <TouchableOpacity
+      style={[styles.card, item.importance && item.importance >= 4 ? styles.cardImportant : null]}
+      activeOpacity={0.7}
+      onPress={() => item.source_url && WebBrowser.openBrowserAsync(item.source_url)}
+    >
       <View style={styles.cardHeader}>
         <View style={[styles.catBadge, item.category === 'ai' ? styles.catAi : item.category === 'finance' ? styles.catFinance : styles.catIndustry]}>
           <Text style={[styles.catText, item.category === 'ai' ? styles.catAiText : item.category === 'finance' ? styles.catFinanceText : styles.catIndustryText]}>
@@ -68,7 +73,7 @@ export default function InsightScreen() {
             : item.source_name || ''}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (

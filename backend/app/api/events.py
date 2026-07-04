@@ -35,8 +35,7 @@ async def create_event(
         tags=parsed.get("tags"),
     )
     is_finance = detect_finance_intent(parsed, data.content)
-    if not is_finance:
-        db.add(event)
+    db.add(event)
     if is_finance:
         finance_data = await parse_finance(data.content)
         txn = FinanceTxn(
