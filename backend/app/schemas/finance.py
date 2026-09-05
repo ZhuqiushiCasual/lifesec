@@ -29,14 +29,6 @@ class FinanceTxnResponse(BaseModel):
 
 
 class FinanceSummary(BaseModel):
-    total_assets: Decimal
-    net_assets: Decimal
     monthly_inflow: Decimal
     monthly_outflow: Decimal
     monthly_net: Decimal
-
-
-class AssetDistribution(BaseModel):
-    category: str
-    amount: Decimal
-    percentage: float

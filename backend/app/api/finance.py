@@ -9,7 +9,6 @@ from app.database import get_db
 from app.models.finance import FinanceTxn
 from app.models.user import User
 from app.schemas.finance import (
-    AssetDistribution,
     FinanceSummary,
     FinanceTxnCreate,
     FinanceTxnResponse,
@@ -102,22 +101,7 @@ async def get_summary(
     monthly_outflow = (await db.execute(expense_q)).scalar()
 
     return FinanceSummary(
-        total_assets=Decimal("0"),
-        net_assets=Decimal("0"),
         monthly_inflow=monthly_inflow,
         monthly_outflow=monthly_outflow,
         monthly_net=monthly_inflow - monthly_outflow,
     )
-
-
-@router.get("/assets")
-async def get_assets(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    return [
-        AssetDistribution(category="stock", amount=Decimal("0"), percentage=0),
-        AssetDistribution(category="fund", amount=Decimal("0"), percentage=0),
-        AssetDistribution(category="real_estate", amount=Decimal("0"), percentage=0),
-        AssetDistribution(category="cash", amount=Decimal("0"), percentage=0),
-    ]

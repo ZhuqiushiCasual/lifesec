@@ -1,11 +1,20 @@
-from fastapi import Depends
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models.user import User
 
 DEFAULT_USER_ID = "u0010000-0000-4000-8000-000000000001"
+
+
+async def verify_token(request: Request) -> None:
+    """固定 token 鉴权：API_TOKEN 为空则跳过（本地开发）。"""
+    if not settings.api_token:
+        return
+    if request.headers.get("X-API-Token") != settings.api_token:
+        raise HTTPException(status_code=401, detail="Invalid or missing API token")
 
 
 async def get_current_user(

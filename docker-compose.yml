@@ -1,19 +1,45 @@
-version: '3.8'
-
+# 一键部署：docker compose up -d --build
+# 应用与数据库分两个容器（MySQL 与应用同容器属反模式）；数据落在 named volume，重建容器不丢
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: life-secretary-mysql
+    restart: unless-stopped
+    environment:
+      # 个人部署默认值，介意可改成在 compose 同目录放 .env 用 ${VAR} 覆盖
+      MYSQL_ROOT_PASSWORD: life-root-2026
+      MYSQL_DATABASE: life_secretary
+      MYSQL_USER: lifeapp
+      MYSQL_PASSWORD: life-app-2026
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # 首次启动（空数据卷）自动建表 + 灌种子数据；02 依赖 01 先建好表
+      - ./backend/docker-init/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./backend/mock_data.sql:/docker-entrypoint-initdb.d/02-mock_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 60s
+    # 3306 不对宿主机暴露，仅容器网络内可访问；如需外部调试临时加 ports 映射
 
   api:
     build: ./backend
+    container_name: life-secretary-api
+    restart: unless-stopped
+    env_file:
+      - backend/.env          # OPENAI_API_KEY / API_TOKEN 等；其中 DATABASE_URL 会被下面覆盖
     environment:
-      SECRET_KEY: change-me-in-production
+      DATABASE_URL: mysql+asyncmy://lifeapp:life-app-2026@mysql:3306/life_secretary?charset=utf8mb4
+      TZ: Asia/Shanghai
+      DEBUG: "0"              # 容器内关闭热重载
     ports:
       - "8000:8000"
-
-  web:
-    build: ./frontend
-    ports:
-      - "3000:80"
     depends_on:
-      - api
+      mysql:
+        condition: service_healthy   # healthy = 初始化（建表+种子）已全部完成
 
-
+volumes:
+  mysql_data:
