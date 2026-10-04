@@ -4,10 +4,24 @@
 """
 
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
+
+# ── 日志 ──────────────────────────────────────────────────
+# uvicorn 只管自己的访问日志；应用自己的 logger（selfsec.*）默认会被 root logger
+# 的 WARNING 级别挡住，info 全部丢失。这里显式给 selfsec 命名空间挂 handler。
+_selfsec_logger = logging.getLogger("selfsec")
+_selfsec_logger.setLevel(logging.INFO)
+if not _selfsec_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(
+        logging.Formatter("%(asctime)s  %(levelname)-7s %(name)-18s %(message)s", datefmt="%H:%M:%S")
+    )
+    _selfsec_logger.addHandler(_handler)
+    _selfsec_logger.propagate = False  # 避免重复输出
 
 import app.models  # noqa: F401 —— 注册全部模型，create_all 才能看到
 from app.api import chat, insights, memory, messages, plans
