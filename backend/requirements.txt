@@ -1,6 +1,9 @@
 fastapi
 uvicorn[standard]
-sqlalchemy
+# 必须是 sqlalchemy[asyncio] —— 少了这个 extra 就不会装 greenlet，
+# 而 SQLAlchemy 的 async 引擎在导入时就会因缺 greenlet 直接抛 ImportError。
+# （本地开发环境往往恰好已有 greenlet，所以只有干净镜像里才会暴露这个问题）
+sqlalchemy[asyncio]
 pydantic
 openai
 
