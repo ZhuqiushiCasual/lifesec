@@ -19,10 +19,12 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 DB_FILE = HERE / "smoke_test.db"
-DB_FILE.unlink(missing_ok=True)
 
-# 必须在导入 app 之前设定（app.config 读取环境变量）
-os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{DB_FILE.as_posix()}"
+# 默认用本地 SQLite；若外部已指定 DATABASE_URL（例如指向 MySQL 验证方言），则尊重它
+if "DATABASE_URL" not in os.environ:
+    DB_FILE.unlink(missing_ok=True)
+    os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{DB_FILE.as_posix()}"
+
 os.environ["SCHEDULER_ENABLED"] = "0"
 os.environ["API_TOKEN"] = ""                   # 关闭鉴权，简化测试
 os.environ["PROFILE_TRIGGER_EVENTS"] = "999"   # 避免中途自动刷画像，测试里手动触发
