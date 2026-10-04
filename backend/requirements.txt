@@ -1,8 +1,11 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-asyncmy
 pydantic
-python-multipart
 openai
-email-validator
+
+# 本地默认数据库（DATABASE_URL 不设时走 SQLite，开箱即跑）
+aiosqlite
+
+# 生产数据库驱动（DATABASE_URL=mysql+asyncmy://...）
+asyncmy

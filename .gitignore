@@ -1,14 +1,19 @@
-gitignore
-node_modules/
-.expo/
-dist/
-*.pyc
-__pycache__/
+# ── 环境 ────────────────────────────────────────────────
 .env
-*.egg-info/
-.idea/
-.vscode/
 *.log
-.DS_Store
+
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.egg-info/
 .venv/
 venv/
+
+# ── 本地数据库（DATABASE_URL 走 SQLite 时产生）────────────
+*.db
+*.sqlite3
+
+# ── 编辑器 / 系统 ────────────────────────────────────────
+.idea/
+.vscode/
+.DS_Store

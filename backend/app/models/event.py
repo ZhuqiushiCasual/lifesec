@@ -1,31 +1,50 @@
+"""events —— 进来的东西。
+
+两个来源（source）：
+  user   用户自己说的话（记录 / 规划 / 情绪）
+  hermes 外部系统推来的消息（洞察）
+"""
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, JSON, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
-from typing import Optional
+from app.utils import now_local
+
+# source 取值
+SOURCE_USER = "user"
+SOURCE_HERMES = "hermes"
+
+# type 取值
+TYPE_RECORD = "record"    # 生活记录
+TYPE_PLAN = "plan"        # 待办 / 目标
+TYPE_FINANCE = "finance"  # 财务（由原独立模块降级而来）
+TYPE_INSIGHT = "insight"  # 外部洞察
+TYPE_FEELING = "feeling"  # 情绪表达
 
 
 class Event(Base):
     __tablename__ = "events"
-    __table_args__ = {"comment": "事件记录表——记录用户生活事件（语音/文字输入）"}
+    __table_args__ = {"comment": "事件表——进来的东西（用户输入 / Hermes 推送）"}
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), comment="事件唯一标识 UUID")
-    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, comment="关联用户 ID")
-    type: Mapped[str] = mapped_column(
-        String(50), nullable=False, comment="事件类型（如 life_habit / social / work / health）"
-    )
-    content: Mapped[str] = mapped_column(Text, nullable=False, comment="事件原始内容文本")
-    entities: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="提取的实体信息（JSON）")
-    sentiment: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment="情感倾向（positive / neutral / negative）")
-    sentiment_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="情感得分（0~1）")
-    tags: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True, comment="标签列表（JSON 数组）")
-    voice_source: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否来自语音输入")
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="事件发生时间")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="记录创建时间")
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default=SOURCE_USER, comment="user / hermes")
+    type: Mapped[str] = mapped_column(String(32), nullable=False, default=TYPE_RECORD, comment="record/plan/finance/insight/feeling")
+    content: Mapped[str] = mapped_column(Text, nullable=False, comment="原始文本（用户原话 / 洞察摘要）")
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment="标题（洞察卡用）")
+    entities: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="结构化字段（JSON）")
 
-    user = relationship("User", back_populates="events")
+    # 去重键：Hermes 同一条新闻重复推送时按它幂等
+    dedup_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+
+    # 用 Python 侧默认值而不是 func.now()：后者只到「秒」，
+    # 同一秒内落库的多条记录时间戳相同，ORDER BY 会不稳定
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=now_local, index=True, comment="事件发生时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_local, comment="记录创建时间")

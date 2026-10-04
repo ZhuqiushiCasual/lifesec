@@ -3,100 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Life Secretary</title>
-  <meta name="theme-color" content="#8aab8a">
-  <meta name="description" content="用聊天记录生活，用看板理解自己。">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icons/icon-192.png">
-  <link rel="apple-touch-icon" href="/icons/icon-180.png">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Life Secretary">
+  <title>selfsec</title>
+  <meta name="theme-color" content="#FBF7F1">
+  <meta name="description" content="一个只有聊天窗口的个人秘书。">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🌿</text></svg>">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <span class="dot"></span>
+        <b>selfsec</b>
+      </div>
+      <div class="meta">
+        <button id="plans-badge" class="badge" hidden></button>
+        <span id="today" class="today"></span>
+      </div>
+    </header>
+
+    <main id="stream" class="stream" aria-live="polite"></main>
+
+    <footer class="composer">
+      <textarea id="input" rows="1" maxlength="2000" placeholder="说点什么，它会记得…"></textarea>
+      <button id="send" disabled>发送</button>
+    </footer>
+  </div>
+
   <div id="toast" class="toast" hidden></div>
-
-  <!-- ============ 记录 ============ -->
-  <section class="view" id="view-record">
-    <header class="view-header">
-      <div class="header-row">
-        <div>
-          <p class="greeting-wave" id="greeting">你好 🌿</p>
-          <h1 class="greeting-name" id="greeting-name">Hi</h1>
-          <p class="sub" id="today-date"></p>
-        </div>
-        <div class="status-chips" id="status-chips"></div>
-      </div>
-    </header>
-
-    <div class="scroll">
-      <p class="section-title">今日记录</p>
-      <ul class="timeline" id="timeline"></ul>
-
-      <p class="section-title">核心动态</p>
-      <div class="mini-insights" id="mini-insights"></div>
-    </div>
-
-    <div class="composer">
-      <div class="chips" id="suggestions"></div>
-      <div class="composer-bar">
-        <textarea id="input" rows="1" maxlength="1000"
-                  placeholder="随便说说，我会帮你整理..."></textarea>
-        <button id="send" class="send-btn" aria-label="发送" disabled>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ 秘书 ============ -->
-  <section class="view hidden" id="view-secretary">
-    <header class="view-header">
-      <h1 class="view-title">秘书</h1>
-      <p class="sub" id="secretary-date"></p>
-    </header>
-    <div class="scroll">
-      <div id="sec-board"></div>
-      <div id="sec-charts"></div>
-      <div id="sec-health"></div>
-      <div id="sec-digest"></div>
-      <div id="sec-finance"></div>
-    </div>
-  </section>
-
-  <!-- ============ 洞察 ============ -->
-  <section class="view hidden" id="view-insight">
-    <header class="view-header">
-      <h1 class="view-title">洞察</h1>
-      <div class="chips filter" id="insight-filters"></div>
-    </header>
-    <div class="scroll">
-      <div class="insight-list" id="insight-list"></div>
-      <button id="more-insights" class="ghost-btn hidden">加载更多</button>
-    </div>
-  </section>
-
-  <!-- ============ 底部导航 ============ -->
-  <nav class="tabbar">
-    <button data-view="record" class="active"><span class="tab-icon">📝</span>记录</button>
-    <button data-view="secretary"><span class="tab-icon">🤵</span>秘书</button>
-    <button data-view="insight"><span class="tab-icon">🧭</span>洞察</button>
-  </nav>
-
-  <!-- ============ Token 输入 ============ -->
-  <dialog id="token-dialog">
-    <form method="dialog" id="token-form">
-      <h2>访问令牌</h2>
-      <p class="sub">服务端已开启鉴权，请输入 API Token（只需输入一次）</p>
-      <input type="password" id="token-input" placeholder="API Token" autocomplete="off" required>
-      <button type="submit" class="primary-btn">保存</button>
-    </form>
-  </dialog>
-
   <script src="/app.js"></script>
 </body>
 </html>

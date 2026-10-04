@@ -1,77 +1,118 @@
 # CLAUDE.md
 
-本文件为 Claude Code 在本仓库工作提供指引。
+本文件为 AI 编码助手在本仓库工作提供指引。
 
 ## 项目概述
 
-**Life Secretary** —— 个人生活工作台（单用户）。通过聊天文本记录生活与财务，LLM（DeepSeek，OpenAI 兼容 SDK）自动解析为结构化事件与收支记录，并以看板、周趋势、日报形式呈现。
+**selfsec** —— 单用户的个人秘书（个人项目，非产品）。
 
-- **架构极简**：FastAPI 同时提供 API 和前端静态页，无独立前端工程、无构建步骤
-- `backend/app/`：FastAPI (async) + SQLAlchemy 2.0 + MySQL（asyncmy）
-- `backend/static/`：前端（原生 HTML + CSS + JS 单页，3 个视图：记录/秘书/洞察，PWA 可添加到主屏幕）
-- 历史说明：原 Expo/React Native 前端已废弃删除（git 历史中可找回），如需恢复勿基于它继续开发
+核心是**一个对话接口**：用户说的话被记住、并得到回应；外部的重要消息主动找上门。
+它不是"记录工具"，而是"有回应的东西"——每次输入都必须换来一句话。
+
+- 架构极简：FastAPI 同时提供 API 与前端静态页，无独立前端工程、无构建步骤
+- `backend/app/`：FastAPI (async) + SQLAlchemy 2.0
+  - 默认 **SQLite**（零配置开箱即跑）；生产用 MySQL（`asyncmy`）
+- `backend/static/`：前端（原生 HTML + CSS + JS，**只有一个聊天窗口**，无框架无构建）
+- 设计文档：`docs/PRD-v2.md`（产品规格）、`docs/架构-v1.html` / `.drawio`（架构图）
 
 ## 常用命令
 
 ```bash
-# 后端（Windows 用 conda 环境 life-secretary，Python 3.11；仓库根 venv/ 已废弃为空壳）
-#   python 路径：%USERPROFILE%\.conda\envs\life-secretary\python.exe
-pip install -r backend/requirements.txt
-# 配置在 backend/.env（参考 backend/.env.example）：
-#   DATABASE_URL / OPENAI_API_KEY / OPENAI_MODEL / API_TOKEN
-mysql life_secretary < backend/mock_data.sql   # 本地首次需灌种子数据（含固定用户 Alice）；docker 部署自动灌
+cd backend
 
-cd backend && python startup.py                # 启动（DB 检查 + 自动建表 + uvicorn）
-# 或 python -m uvicorn app.main:app
+# 依赖（Windows 用 conda 环境 life-secretary，Python 3.11）
+pip install -r requirements.txt
 
-docker compose up -d --build                   # 远程部署：api + mysql 两容器，端口 8000，首次自动建表+灌种子
+# 配置：复制 .env.example 为 .env
+#   不设 DATABASE_URL 就走 SQLite（./selfsec.db），无需装数据库
+#   生产：DATABASE_URL=mysql+asyncmy://user:pass@host:3306/selfsec?charset=utf8mb4
+
+python startup.py                              # 启动（等 DB → 建表 → uvicorn）
+python smoke_test.py                           # 端到端冒烟测试（用 SQLite，不碰生产库）
+python -m uvicorn app.main:app --port 8123     # 直接起服务
+
+docker compose up -d --build                   # 远程部署（api + mysql）
 ```
 
-- 无测试、无 lint 配置、无 CI；改完直接启动验证
-- 手机访问：浏览器打开 `http://<服务器IP>:8000`；HTTPS 环境下可安装为 PWA（manifest + sw.js 已就绪，HTTP 下 service worker 会被浏览器禁用，属正常降级）
+表结构与锚点用户由 `app/main.py` 的 lifespan 自动创建，**没有种子 SQL、没有迁移工具**。
 
 ## 架构要点
 
-- `app/main.py`：lifespan 自动建表（无 Alembic，改模型需手动改表或重建库）；所有 API 路由挂 `verify_token` 依赖；`/` 挂载 StaticFiles(html=True) 托管前端
-- **鉴权**：单固定 token——环境变量 `API_TOKEN` 非空时，所有 `/api/*` 请求必须带 `X-API-Token` 头，否则 401；为空则跳过（本地开发）。前端遇 401 弹窗索要并存 localStorage
-- **单用户**：`services/deps.py` 硬编码 `DEFAULT_USER_ID`（Alice），`users` 表仅作外键锚点，无注册/登录
-- 分层：`api/`（路由）→ `services/`（业务）→ `models/`（5 表）+ `schemas/`（Pydantic）
-- AI 调用集中在 `services/ai/`：`client.py`（AsyncOpenAI 单例）、`event_parser.py`（temp=0.1，json_object）、`finance_parser.py`
-- 核心数据流：`POST /api/events` → `parse_event` 抽取 → `detect_finance_intent` 命中则二次调用 `parse_finance` → 同事务写 `finance_txns`
-- 前端无框架无构建：`static/index.html`（结构）+ `styles.css`（主题变量同原 RN 配色）+ `app.js`（hash 路由 + fetch，`X-API-Token` 统一注入）
+一条主线，五个概念：
 
-## API 端点（全部需要 X-API-Token，若启用）
+```
+① 输入    ② 对话接口            ③ Context 组装        ④ 记忆层            ⑤/⑥ 数据与输出
+聊天窗口 → POST /api/chat  → System Prompt (长且稳定)  4.1 长期画像         events / messages
+定时触发   意图路由 + 编排       Memory Block (动态)    4.2 事实与统计       plans / memory_profile
+Hermes     一次 LLM 调用         当前 User Message     4.3 洞察记忆         → 一句话回应 + 卡片
+                                4.4 会话短期
+```
+
+- **`services/agent.py` 是编排核心**：`意图路由 → 组装 Context → 生成回应 → 落事件 → 落消息`
+- **全程只有一次 LLM 调用**（`services/ai/reply.py`），意图判定与字段抽取都在这一次里完成。
+  `route()` 只做本地能确定的事（判断是否在表达情绪），不做第二次调用
+- **记忆层四层**（`services/memory/`），按"变化频率 / 成本"划分：
+  - `profile.py` 4.1 长期画像——「总结意识」，定期/阈值/手动把全部事件压成一段话（对应 Hermes 的 user.md）
+  - `stats.py` 4.2 事实与统计——纯 SQL 聚合/对比，**不过 LLM**，提供"比较档"回应的原料
+  - `insights.py` 4.3 洞察记忆——外部驱动，读 `events(source=hermes)`
+  - `session.py` 4.4 会话短期——最近 N 轮，用于指代消解
+- **内置调度**（`services/scheduler.py`）：一个 asyncio 循环，早晚各一次问候 + 夜间重算画像。
+  刻意不引 APScheduler
+- **前端零依赖零构建**：`static/app.js` 渲染"用户轮 + 秘书轮"合一的消息流，卡片是唯一的结构化输出形式
+
+## API 端点
 
 | 方法 | 路径 | 功能 |
 |---|---|---|
-| POST | `/api/events` | 创建事件（AI 抽取，命中财务意图时联动生成流水） |
-| GET | `/api/events?page=&page_size=` | 事件分页列表 |
-| DELETE | `/api/events/{id}` | 删除事件 |
-| POST | `/api/finance/txns` | 创建财务（AI 解析） |
-| GET | `/api/finance/txns?page=` | 流水列表 |
-| DELETE | `/api/finance/txns/{id}` | 删除流水 |
-| GET | `/api/finance/summary` | 本月流入/流出/净额 |
-| GET | `/api/insights?category=&page=` | 洞察列表（只读，种子数据） |
-| GET | `/api/insights/{id}` | 洞察详情 |
-| GET | `/api/digests/latest` | 最新日报（只读，种子数据） |
-| GET | `/api/digests?date=` | 按日期查日报 |
-| GET | `/api/board/today` | 今日看板聚合 |
-| GET | `/api/memory/trends?days=` | 按类型/情感的趋势统计 |
-| GET | `/api/memory/weekly` | 本周图表数据（运动/睡眠/热量/心情/事件） |
-| GET | `/api/memory/review?date=` | 指定日期回顾 |
+| POST | `/api/chat` | **唯一入口**。意图路由 + 抽取 + 回应，返回 `{reply, card, message_id}` |
+| GET | `/api/messages?limit=` | 窗口流（`role=me` 用户轮 + `role=secretary` 秘书轮，按时间合并） |
+| POST | `/api/insights` | **Hermes 回调入口**。落 `events(source=hermes)` + 生成洞察消息，按 `source_url` 幂等 |
+| GET | `/api/plans` | 待办列表（默认只返回 open） |
+| PATCH | `/api/plans/{id}` | 勾选待办（`{"status": "open\|done"}`） |
+| GET | `/api/memory` | 查看长期画像 |
+| POST | `/api/memory/refresh` | 手动强制重算画像 |
 | GET | `/health` | 健康检查（无鉴权） |
+| GET | `/` | 前端静态页 |
 
-## 已知限制 / 注意点
+所有 `/api/*` 在 `API_TOKEN` 非空时需请求头 `X-API-Token`；为空则不校验（本地开发）。
 
-1. **insights / digests 无写入入口**：两表只靠 `mock_data.sql` 种子；日报/洞察 AI 自动生成未实现
-2. **语音录入已移除**：原 voice 路由有 bug 且前端未使用，已删除；浏览器方案需 HTTPS 才能用麦克风，将来要做时需先上 HTTPS
-3. **无迁移工具**：改 `models/` 字段需手动 ALTER 或删库重建；Docker 初始建表 SQL 由 `backend/gen_schema.py` 生成（`cd backend && python gen_schema.py` → `docker-init/01-schema.sql`），改模型后需重新生成
-4. **secrets 曾入库**：旧 config.py 硬编码过 DB 密码与 DeepSeek key（仍在 git 历史），现值已移至 `backend/.env`（gitignored），建议轮换 key
-5. `docker-compose.yml` 内 MySQL 密码为明文默认值（仅容器内网可用，3306 未对宿主机暴露），个人部署可接受；OPENAI_API_KEY / API_TOKEN 经 `env_file` 注入 `backend/.env`，不进镜像
+## 数据模型（4 张表 + 用户锚点）
+
+```
+users           单用户，仅作外键锚点，启动时自动创建
+events          进来的东西  ← source=user(用户输入) / hermes(洞察推送)
+                type: record | plan | finance | insight | feeling
+                entities(JSON) 存结构化字段；dedup_key 供 Hermes 幂等
+messages        它说的话    ← kind: reply | greeting | insight | nudge
+                card(JSON) 直接存卡片，前端不用 join
+plans           待办 / 目标，从对话里长出来，可勾选
+memory_profile  长期画像，单用户单行，version 递增
+```
+
+**时间戳用 Python 侧 `default=now_local`，不是 `func.now()`。**
+后者只到「秒」，同一秒内落库的多条记录时间戳相同，`ORDER BY` 会不稳定（消息流会错序）。
+
+## 与 Hermes 的边界
+
+- 抓取 / 筛选 / 去重由 **Hermes** 负责（定时任务 + anysearch）
+- selfsec **不自建抓取管线**，只接收一个标准回调 `POST /api/insights`
+- Hermes 侧的 prompt 与接口约定见 `docs/hermes-新闻任务.md`
 
 ## 约定
 
 - 注释与文档以中文为主，标识符用英文
-- 后端遵循 api → services → models/schemas 分层；AI prompt 与解析逻辑只放在 `services/ai/`
-- 前端保持零依赖零构建：不引入框架/打包器；样式统一用 `styles.css` 的 CSS 变量，不要硬编码颜色
+- 分层：`api/`（路由）→ `services/`（业务）→ `models/` + `schemas/`
+- **AI 调用只放在 `services/ai/`**（`client.py` 统一出口，失败抛 `AIUnavailable`，调用方必须降级）
+- 任何 LLM 失败都不能让用户看到报错——回应生成有本地兜底（"记下了。"）
+- 前端保持零依赖零构建：不引入框架/打包器；卡片样式统一在 `styles.css`
 - 响应错误保持 `{"detail": "..."}` 风格
+
+## 已知限制 / 注意点
+
+1. **改表结构需重建库**：无 Alembic，`create_all` 只建缺失的表、不会 ALTER 已有表。
+   从旧版升级（旧库有 `finance_txns` / `insights` / `digests`）**必须换新库**
+2. **`backend/.env` 里现在指向的是旧的远程库**，且是旧表结构 —— 用之前先确认/更换 `DATABASE_URL`
+3. **无测试框架**，只有 `smoke_test.py`（26 项断言，端到端，离线可跑）
+4. **secrets 曾入库**：旧版 `config.py` 硬编码过 DB 密码与 DeepSeek key（仍在 git 历史），建议轮换
+5. **抚慰（P2）尚未实现**：`route()` 已识别情绪词并给模型提示，但没有独立的抚慰议程
+6. **PWA 已移除**：`sw.js` / `manifest` / icons 已删，浏览器麦克风仍需 HTTPS

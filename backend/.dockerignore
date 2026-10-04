@@ -1,0 +1,9 @@
+# 构建镜像时排除：secrets 与本地数据不进镜像，配置统一由 compose 注入
+.env
+*.db
+*.sqlite3
+__pycache__/
+*.pyc
+venv/
+.venv/
+smoke_test.py
