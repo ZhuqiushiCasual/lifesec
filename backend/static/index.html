@@ -17,6 +17,7 @@
         <b>selfsec</b>
       </div>
       <div class="meta">
+        <button id="open-history" class="badge">全部</button>
         <button id="plans-badge" class="badge" hidden></button>
         <span id="today" class="today"></span>
       </div>
@@ -31,6 +32,23 @@
   </div>
 
   <div id="toast" class="toast" hidden></div>
+
+  <!-- 回溯：只读的历史，弹层即可，不占一个页面 -->
+  <div id="drawer" class="drawer" hidden>
+    <div class="drawer-panel">
+      <div class="drawer-head">
+        <div class="drawer-tabs" id="drawer-tabs">
+          <button data-f="all" class="on">全部</button>
+          <button data-f="record">记录</button>
+          <button data-f="insight">洞察</button>
+        </div>
+        <button id="drawer-close" class="drawer-close">关闭</button>
+      </div>
+      <div class="drawer-body" id="drawer-body"></div>
+      <button id="drawer-more" class="drawer-more" hidden>加载更早</button>
+    </div>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>

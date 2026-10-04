@@ -1,4 +1,4 @@
-/* selfsec 前端 —— 一个窗口，零依赖零构建。 */
+/* selfsec 前端 —— 一个窗口 + 一个回溯弹层。零依赖零构建。 */
 
 const $ = (s) => document.querySelector(s);
 const stream = $('#stream');
@@ -11,10 +11,24 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
+function toDate(iso) {
+  return new Date(String(iso).replace(' ', 'T'));
+}
+
 function hhmm(iso) {
-  const d = new Date(String(iso).replace(' ', 'T'));
+  const d = toDate(iso);
+  return isNaN(d) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function dayLabel(iso) {
+  const d = toDate(iso);
   if (isNaN(d)) return '';
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const key = (x) => `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`;
+  const now = new Date();
+  const yest = new Date(Date.now() - 864e5);
+  if (key(d) === key(now)) return '今天';
+  if (key(d) === key(yest)) return '昨天';
+  return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
 }
 
 let toastTimer;
@@ -49,7 +63,7 @@ async function api(path, opts = {}) {
   return res.status === 204 ? null : res.json();
 }
 
-/* ---------- 渲染 ---------- */
+/* ---------- 主窗口渲染 ---------- */
 function cardHTML(card) {
   if (!card) return '';
   const kind = ['record', 'plan', 'greeting', 'insight'].includes(card.kind) ? card.kind : 'record';
@@ -82,7 +96,7 @@ function cardHTML(card) {
 
 function rowHTML(m) {
   const mine = m.role === 'me';
-  const quiet = !mine && !m.card && ['greeting'].includes(m.kind);
+  const quiet = !mine && !m.card && m.kind === 'greeting';
   return `<div class="row ${mine ? 'me' : 'sec'}">
     <div class="bubble${quiet ? ' quiet' : ''}">${esc(m.content)}</div>
     ${mine ? '' : cardHTML(m.card)}
@@ -106,6 +120,87 @@ function renderBadge() {
   b.textContent = `${open} 个待办`;
 }
 
+/* ---------- 回溯弹层 ---------- */
+const D = { filter: 'all', items: [], cursor: null, done: false, loading: false };
+const PAGE = 30;
+
+function hitemHTML(m) {
+  const mine = m.role === 'me';
+  let cls = 'record';
+  let label = mine ? '记录' : '回应';
+  if (m.kind === 'insight') { cls = 'insight'; label = '洞察'; }
+  else if (m.kind === 'greeting') { label = '问候'; }
+  if (m.card && m.card.kind === 'plan') { cls = 'plan'; label = '待办'; }
+
+  const card = m.card || {};
+  const lines = card.lines || [];
+  const text = m.kind === 'insight'
+    ? [m.content, ...lines.slice(1)].filter(Boolean).join('\n')
+    : m.content;
+  const url = card.meta && card.meta.source_url;
+  const link = url
+    ? `<div class="hlink">来源：<a href="${esc(url)}" target="_blank" rel="noreferrer">${esc(card.meta.source_name || url)}</a></div>`
+    : '';
+
+  return `<div class="hitem ${cls}">
+    <div class="htime">${hhmm(m.created_at)}</div>
+    <div class="hbody"><span class="hkind">${label}</span><div class="htext">${esc(text)}</div>${link}</div>
+  </div>`;
+}
+
+function renderDrawer() {
+  const body = $('#drawer-body');
+  if (!D.items.length) {
+    body.innerHTML = `<div class="drawer-empty">这里还没有内容。</div>`;
+    return;
+  }
+  let html = '';
+  let lastDay = '';
+  for (const m of D.items) {
+    const day = dayLabel(m.created_at);
+    if (day !== lastDay) {
+      html += `<div class="daysep">${day}</div>`;
+      lastDay = day;
+    }
+    html += hitemHTML(m);
+  }
+  body.innerHTML = html;
+}
+
+async function loadDrawer(reset) {
+  if (D.loading) return;
+  D.loading = true;
+  if (reset) {
+    D.items = [];
+    D.cursor = null;
+    D.done = false;
+    $('#drawer-body').innerHTML = `<div class="drawer-empty">加载中…</div>`;
+  }
+  let url = `/api/messages?filter=${D.filter}&order=desc&limit=${PAGE}`;
+  if (D.cursor) url += `&before=${encodeURIComponent(D.cursor)}`;
+  try {
+    const rows = await api(url);
+    if (rows.length < PAGE) D.done = true;
+    if (rows.length) D.cursor = rows[rows.length - 1].created_at;
+    D.items = D.items.concat(rows);
+    renderDrawer();
+    $('#drawer-more').hidden = D.done || !D.items.length;
+  } catch (e) {
+    $('#drawer-body').innerHTML = `<div class="drawer-empty">加载失败：${esc(e.message)}</div>`;
+  } finally {
+    D.loading = false;
+  }
+}
+
+function openDrawer() {
+  $('#drawer').hidden = false;
+  loadDrawer(true);
+}
+
+function closeDrawer() {
+  $('#drawer').hidden = true;
+}
+
 /* ---------- 加载 ---------- */
 async function loadAll() {
   const [msgs, pl] = await Promise.all([api('/api/messages?limit=60'), api('/api/plans')]);
@@ -125,7 +220,6 @@ async function send() {
   btn.disabled = true;
   input.disabled = true;
 
-  // 先本地上屏，不等服务端
   items.push({ id: 'local', role: 'me', kind: 'user', content, card: null, created_at: new Date().toISOString() });
   input.value = '';
   autosize();
@@ -191,9 +285,27 @@ stream.addEventListener('click', (e) => {
   if (row) togglePlan(row.dataset.plan);
 });
 
-$('#plans-badge').addEventListener('click', async () => {
+$('#plans-badge').addEventListener('click', () => {
   const open = plans.filter((p) => p.status === 'open');
   toast(open.length ? open.map((p) => '· ' + p.title).join('   ') : '没有未完成的待办', 3200);
+});
+
+/* 回溯 */
+$('#open-history').addEventListener('click', openDrawer);
+$('#drawer-close').addEventListener('click', closeDrawer);
+$('#drawer-more').addEventListener('click', () => loadDrawer(false));
+$('#drawer').addEventListener('click', (e) => {
+  if (e.target.id === 'drawer') closeDrawer();   // 点遮罩关闭
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#drawer').hidden) closeDrawer();
+});
+$('#drawer-tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-f]');
+  if (!b) return;
+  D.filter = b.dataset.f;
+  [...$('#drawer-tabs').children].forEach((x) => x.classList.toggle('on', x === b));
+  loadDrawer(true);
 });
 
 /* ---------- 启动 ---------- */
