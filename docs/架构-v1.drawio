@@ -1,0 +1,189 @@
+<mxfile host="app.diagrams.net" agent="Hermes" version="24.7.17">
+  <diagram id="selfsec-arch-v1" name="selfsec 架构 v1">
+    <mxGraphModel dx="1422" dy="798" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1450" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="selfsec 架构 v1 · 核心是一个对话接口" style="text;html=1;align=left;verticalAlign=middle;fontSize=17;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="5" width="900" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 1 输入层 ==================== -->
+        <mxCell id="in" value="① 输入层 —— 输入来源多样" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontStyle=1;fontSize=13;fillColor=#F2F2F2;strokeColor=#9E9E9E;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1040" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="chat" value="聊天窗口（用户）&#10;唯一主入口 · 无分类无表单" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;" vertex="1" parent="in">
+          <mxGeometry x="40" y="45" width="220" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="timer" value="定时触发&#10;（问候 / 内置调度）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;" vertex="1" parent="in">
+          <mxGeometry x="300" y="45" width="220" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="voice" value="语音输入（后置）&#10;需 HTTPS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;dashed=1;opacity=60;" vertex="1" parent="in">
+          <mxGeometry x="560" y="45" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="future" value="预留入口&#10;（图片 / 第三方转发）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;dashed=1;opacity=60;" vertex="1" parent="in">
+          <mxGeometry x="800" y="45" width="200" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 2 对话接口 ==================== -->
+        <mxCell id="api" value="② 对话接口  POST /api/chat —— 系统唯一入口" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontStyle=1;fontSize=13;fillColor=#EAF6EA;strokeColor=#82B366;" vertex="1" parent="1">
+          <mxGeometry x="240" y="230" width="640" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="route" value="意图路由&#10;记录 / 规划 / 问候 / 情绪 / 闲聊" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="api">
+          <mxGeometry x="45" y="42" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="builder" value="Context 构造器&#10;（记忆检索 + 组装）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="api">
+          <mxGeometry x="345" y="42" width="250" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 3 Context 组装 ==================== -->
+        <mxCell id="ctx" value="③ Context 组装（参考 Hermes / Claude Code）" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontStyle=1;fontSize=13;fillColor=#F4EEF8;strokeColor=#9673A6;" vertex="1" parent="1">
+          <mxGeometry x="240" y="420" width="640" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="sp" value="System Prompt&#10;身份 / 核心目的 / 边界&#10;（长且稳定）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=12;" vertex="1" parent="ctx">
+          <mxGeometry x="25" y="55" width="140" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="mb" value="Memory Block&#10;画像 + 统计 + 洞察&#10;（动态注入）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=12;" vertex="1" parent="ctx">
+          <mxGeometry x="180" y="55" width="140" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="um" value="当前 User Message&#10;（本次输入）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=12;" vertex="1" parent="ctx">
+          <mxGeometry x="335" y="55" width="140" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="ic" value="洞察上下文&#10;外部世界变化&#10;对计划的影响" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="ctx">
+          <mxGeometry x="490" y="55" width="130" height="95" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== LLM ==================== -->
+        <mxCell id="llm" value="LLM 服务（DeepSeek）&#10;OpenAI 兼容 SDK&#10;回应生成 · 摘要生成" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="430" width="520" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 4 记忆层 ==================== -->
+        <mxCell id="mem" value="④ 记忆层 —— 本项目真正的技术核心" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontStyle=1;fontSize=13;fillColor=#FFF7EC;strokeColor=#D79B00;" vertex="1" parent="1">
+          <mxGeometry x="40" y="660" width="1040" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" value="4.1 长期画像 ·「总结意识」&#10;—&#10;触发：每日定时 / 新增 N 条事件 / 手动&#10;处理：扫描该用户全部事件&#10;→ LLM 压成一段精炼画像&#10;形式：单用户单行文本&#10;（参考 Hermes user.md）&#10;作用：慢变、低成本、全context 注入" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="mem">
+          <mxGeometry x="25" y="45" width="230" height="225" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" value="4.2 事实与统计&#10;—&#10;聚合 SQL：本周运动次数&#10;对比 SQL：环比上周 / 上月&#10;全量历史：单用户数据量小，&#10;可直接取用&#10;特点：不过 LLM，实时查，&#10;用于「比较档」回应&#10;（“这周第三次，比上周多”）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="mem">
+          <mxGeometry x="270" y="45" width="230" height="225" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" value="4.3 洞察记忆&#10;—&#10;来源：Hermes 推送&#10;内容：市场 / 行业 / 天气 / 行情&#10;（股票线后续抛弃）&#10;作用：外部变化 → 对当前计划的影响&#10;特点：外部驱动写入，不可自造" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="mem">
+          <mxGeometry x="515" y="45" width="230" height="225" as="geometry" />
+        </mxCell>
+        <mxCell id="m4" value="4.4 会话短期&#10;—&#10;最近 N 轮对话&#10;作用：指代消解&#10;（“那个”“上次说的那件事”）&#10;边界：不无限增长，&#10;不做自由陪聊" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="mem">
+          <mxGeometry x="760" y="45" width="250" height="225" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 5 数据层 ==================== -->
+        <mxCell id="data" value="⑤ 数据层" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontStyle=1;fontSize=13;fillColor=#F5F5F5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1010" width="1040" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" value="events&#10;进来的东西&#10;（用户 / Hermes）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;fontSize=12;" vertex="1" parent="data">
+          <mxGeometry x="40" y="50" width="180" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" value="messages&#10;它说的话&#10;（所有回应）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;fontSize=12;" vertex="1" parent="data">
+          <mxGeometry x="250" y="50" width="180" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="d3" value="plans&#10;待办 / 目标" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;fontSize=12;" vertex="1" parent="data">
+          <mxGeometry x="460" y="50" width="180" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="d4" value="memory_profile&#10;长期画像（单行 · 可版本化）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;fontSize=12;" vertex="1" parent="data">
+          <mxGeometry x="670" y="50" width="240" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 6 输出 ==================== -->
+        <mxCell id="out" value="⑥ 输出（回到同一个窗口）" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontStyle=1;fontSize=13;fillColor=#EAF6EA;strokeColor=#82B366;" vertex="1" parent="1">
+          <mxGeometry x="240" y="1220" width="640" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="o1" value="一句话回应&#10;（永远回应，不可省）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="out">
+          <mxGeometry x="40" y="45" width="250" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="o2" value="卡片&#10;记录 / 计划 / 问候 / 洞察" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="out">
+          <mxGeometry x="340" y="45" width="270" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 7 洞察线 ==================== -->
+        <mxCell id="ins" value="⑦ 洞察线（外部系统）—— 不自建抓取" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontStyle=1;fontSize=13;fillColor=#FFFCF0;strokeColor=#D6B656;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="40" width="520" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="i1" value="Hermes 定时任务（cron）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="ins">
+          <mxGeometry x="30" y="45" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="i2" value="抓取 + 筛选 + 去重" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="ins">
+          <mxGeometry x="280" y="45" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="i3" value="POST /api/insights&#10;（回调 selfsec）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="ins">
+          <mxGeometry x="30" y="140" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="i4" value="落库&#10;events(source=hermes)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="ins">
+          <mxGeometry x="280" y="140" width="210" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="i5" value="生成 messages(kind=insight) → 窗口内出现洞察卡" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="ins">
+          <mxGeometry x="30" y="235" width="460" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 8 调度 ==================== -->
+        <mxCell id="sched" value="定时调度器&#10;早 8:00 / 晚 21:00 问候&#10;21:00 画像总结（总结意识触发）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="600" width="520" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 9 可观测 ==================== -->
+        <mxCell id="obs" value="可观测指标（每个模块必须有）&#10;—&#10;记录：连续记录天数&#10;问候：问候的次日回应率&#10;洞察：卡片点击率&#10;抚慰：暂缺（不可验证，标为实验性）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=12;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="760" width="520" height="150" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 10 不做 ==================== -->
+        <mxCell id="no" value="明确不做（边界）&#10;—&#10;· 自由多轮陪聊（无边界对话）&#10;· 自建抓取管线（RSS / 爬虫 / 聚类）&#10;· 趋势图表 / 日报评分 / 资产分布&#10;· 多用户 / 注册登录&#10;· 语音输入（需 HTTPS，后置）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDEBEB;strokeColor=#B85450;fontSize=12;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="950" width="520" height="210" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 连线 ==================== -->
+        <mxCell id="e1" value="输入" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="chat" target="route">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;dashed=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="timer" target="route">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;dashed=1;opacity=50;" edge="1" parent="1" source="voice" target="route">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="路由后" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="route" target="builder">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="检索 / 组装" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="builder" target="ctx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="读 / 写" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;startArrow=classic;endArrow=classic;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="mb" target="mem">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="组装后的 prompt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="ctx" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="回应" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="llm" target="out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="回到窗口展示" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;dashed=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="out" target="chat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="摘要生成" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;dashed=1;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="m1" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="读写" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;startArrow=classic;endArrow=classic;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="mem" target="data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="定时触发" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="sched" target="route">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="落库 + 生成 message" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="ins" target="data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="写入洞察记忆" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="ins" target="m3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

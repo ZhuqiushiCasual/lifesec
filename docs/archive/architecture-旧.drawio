@@ -1,0 +1,232 @@
+<mxfile host="app.diagrams.net" modified="2026-06-23T00:00:00.000Z" agent="opencode" version="24.0.0">
+  <diagram id="life-secretary-arch" name="Life Secretary Backend Architecture">
+    <mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ==================== TITLE ==================== -->
+        <mxCell id="title" value="Life Secretary 后端架构图 — 表关系 · 数据生成 · AI 抽取" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1620" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== GROUP: 输入层 ==================== -->
+        <mxCell id="g_input" value="① 输入层 / Input Sources" style="swimlane;fontSize=14;fontStyle=1;align=left;spacingLeft=12;startSize=28;horizontal=1;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="60" width="1620" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="in_voice" value="🎤 语音输入&#10;(audio base64)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="g_input">
+          <mxGeometry x="100" y="40" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="in_text" value="⌨️ 文字输入&#10;(content)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="g_input">
+          <mxGeometry x="340" y="40" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="in_frontend" value="🖥️ 前端应用 (React)&#10;Bearer Token 认证" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="g_input">
+          <mxGeometry x="720" y="40" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="in_mock" value="📄 mock_data.sql&#10;(种子数据)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=12;dashed=1;" vertex="1" parent="g_input">
+          <mxGeometry x="1080" y="40" width="160" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== GROUP: FastAPI 路由层 ==================== -->
+        <mxCell id="g_api" value="② API 路由层 / FastAPI Routers  (app/api/*.py)" style="swimlane;fontSize=14;fontStyle=1;align=left;spacingLeft=12;startSize=28;horizontal=1;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="195" width="1620" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="api_auth" value="auth.py&#10;POST /api/auth/register&#10;POST /api/auth/login" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="g_api">
+          <mxGeometry x="30" y="40" width="170" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="api_voice" value="voice.py&#10;POST /api/voice/transcribe&#10;(Whisper + 意图识别)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="g_api">
+          <mxGeometry x="220" y="40" width="180" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="api_events" value="events.py&#10;POST /api/events ★&#10;GET /api/events&#10;DELETE /api/events/{id}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="g_api">
+          <mxGeometry x="420" y="40" width="170" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="api_finance" value="finance.py&#10;POST /api/finance/txns ★&#10;GET summary / assets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="g_api">
+          <mxGeometry x="610" y="40" width="170" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="api_insights" value="insights.py&#10;GET /api/insights (只读)&#10;GET /api/insights/{id}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="g_api">
+          <mxGeometry x="800" y="40" width="170" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="api_digests" value="digests.py&#10;GET /api/digests/latest (只读)&#10;GET /api/digests?date=" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="g_api">
+          <mxGeometry x="990" y="40" width="180" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="api_board" value="board.py&#10;GET /api/board/today&#10;(聚合看板)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="g_api">
+          <mxGeometry x="1190" y="40" width="150" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="api_memory" value="memory.py&#10;GET /api/memory/trends&#10;GET /api/memory/review" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="g_api">
+          <mxGeometry x="1360" y="40" width="170" height="95" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== GROUP: AI 服务层 ==================== -->
+        <mxCell id="g_ai" value="③ AI 服务层 / AI Services  (app/services/ai/*.py)" style="swimlane;fontSize=14;fontStyle=1;align=left;spacingLeft=12;startSize=28;horizontal=1;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="370" width="1620" height="220" as="geometry" />
+        </mxCell>
+
+        <!-- OpenAI/DeepSeek client -->
+        <mxCell id="ai_client" value="OpenAI AsyncClient&#10;(client.py — lru_cache 单例)&#10;base_url = api.deepseek.com&#10;model = deepseek-v4-pro&#10;temperature = 0.1&#10;response_format = json_object" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="g_ai">
+          <mxGeometry x="1180" y="45" width="250" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- Whisper -->
+        <mxCell id="ai_whisper" value="Whisper-1&#10;语音转文字&#10;(audio.transcriptions)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="g_ai">
+          <mxGeometry x="60" y="45" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Intent Classifier -->
+        <mxCell id="ai_intent" value="意图识别&#10;LLM 判断:&#10;&quot;life&quot; | &quot;finance&quot;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="g_ai">
+          <mxGeometry x="290" y="35" width="160" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Event Parser -->
+        <mxCell id="ai_event" value="Event Parser&#10;(event_parser.py)&#10;System Prompt → 结构化 JSON:&#10;• type (dietary/sport/health/&#10;  mood/invest/event)&#10;• entities {food, activity, symptom,&#10;  mood, amount, currency, ...}&#10;• sentiment + score (0~1)&#10;• tags []&#10;▸ detect_finance_intent():&#10;  type==invest OR (amount+category)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="g_ai">
+          <mxGeometry x="520" y="40" width="290" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- Finance Parser -->
+        <mxCell id="ai_finance" value="Finance Parser&#10;(finance_parser.py)&#10;System Prompt → 结构化 JSON:&#10;• type (expense/income/&#10;  asset/liability)&#10;• amount, currency&#10;• category (food/transport/salary/&#10;  rent/shopping/medical/&#10;  invest_*/real_estate/cash/other)&#10;• counterparty, account&#10;  (支付宝/微信/银行卡/证券账户)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;" vertex="1" parent="g_ai">
+          <mxGeometry x="860" y="40" width="280" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- Auth Service note -->
+        <mxCell id="ai_auth_svc" value="Auth Service (auth.py)&#10;SHA-256 + salt 密码哈希&#10;HMAC-SHA256 签名 Token&#10;(非 JWT, 30天过期)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=10;dashed=1;" vertex="1" parent="g_ai">
+          <mxGeometry x="60" y="135" width="200" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== GROUP: 数据库层 ==================== -->
+        <mxCell id="g_db" value="④ 数据层 / MySQL  (SQLAlchemy ORM · asyncmy)" style="swimlane;fontSize=14;fontStyle=1;align=left;spacingLeft=12;startSize=28;horizontal=1;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="620" width="1620" height="560" as="geometry" />
+        </mxCell>
+
+        <!-- users table (center) -->
+        <mxCell id="db_users" value="&lt;b style=&quot;font-size:13px&quot;&gt;👤 users&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;color:#999&quot;&gt;用户表 — 账号信息&lt;/span&gt;&lt;hr&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:10px&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id (UUID)&lt;br&gt;email (UNIQUE)&lt;br&gt;name&lt;br&gt;hashed_password (SHA-256)&lt;br&gt;preferences (JSON)&lt;br&gt;is_active (bool)&lt;br&gt;created_at&lt;br&gt;updated_at&lt;/div&gt;" style="verticalAlign=top;align=center;whiteSpace=wrap;html=1;rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" vertex="1" parent="g_db">
+          <mxGeometry x="680" y="50" width="220" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- events table -->
+        <mxCell id="db_events" value="&lt;b style=&quot;font-size:13px&quot;&gt;📋 events&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;color:#999&quot;&gt;事件记录表 — 生活事件&lt;/span&gt;&lt;hr&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:10px&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id (UUID)&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id → users.id&lt;br&gt;type (health/dietary/work/&lt;br&gt;&amp;nbsp;&amp;nbsp;social/mood/sport/invest/event)&lt;br&gt;content (Text — 原文)&lt;br&gt;entities (JSON — AI抽取实体)&lt;br&gt;sentiment (pos/neutral/neg)&lt;br&gt;sentiment_score (Float 0~1)&lt;br&gt;tags (JSON array)&lt;br&gt;voice_source (bool)&lt;br&gt;recorded_at / created_at&lt;/div&gt;" style="verticalAlign=top;align=center;whiteSpace=wrap;html=1;rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" vertex="1" parent="g_db">
+          <mxGeometry x="60" y="290" width="240" height="240" as="geometry" />
+        </mxCell>
+
+        <!-- finance_txns table -->
+        <mxCell id="db_finance" value="&lt;b style=&quot;font-size:13px&quot;&gt;💰 finance_txns&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;color:#999&quot;&gt;财务记录表 — 收支明细&lt;/span&gt;&lt;hr&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:10px&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id (UUID)&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id → users.id&lt;br&gt;type (income/expense/&lt;br&gt;&amp;nbsp;&amp;nbsp;asset/liability)&lt;br&gt;amount (Numeric 15,2)&lt;br&gt;currency (CNY 默认)&lt;br&gt;category (food/transport/salary/&lt;br&gt;&amp;nbsp;&amp;nbsp;rent/shopping/medical/invest_*/...)&lt;br&gt;counterparty (交易对手)&lt;br&gt;account (支付宝/微信/银行卡/...)&lt;br&gt;note / voice_source / recorded_at&lt;/div&gt;" style="verticalAlign=top;align=center;whiteSpace=wrap;html=1;rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" vertex="1" parent="g_db">
+          <mxGeometry x="380" y="290" width="240" height="240" as="geometry" />
+        </mxCell>
+
+        <!-- insights table -->
+        <mxCell id="db_insights" value="&lt;b style=&quot;font-size:13px&quot;&gt;💡 insights&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;color:#999&quot;&gt;信息洞察表 — 知识/摘要&lt;/span&gt;&lt;hr&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:10px&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id (UUID)&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id → users.id&lt;br&gt;title (标题)&lt;br&gt;summary (核心摘要)&lt;br&gt;impact (影响分析)&lt;br&gt;category (tech/finance/&lt;br&gt;&amp;nbsp;&amp;nbsp;health/career)&lt;br&gt;topics (JSON array)&lt;br&gt;importance (1~5)&lt;br&gt;source_url / source_name&lt;br&gt;published_at / created_at&lt;br&gt;&lt;br&gt;&lt;i style=&quot;color:#b85450&quot;&gt;⚠ 无写入 API, 仅 mock 种子&lt;/i&gt;&lt;/div&gt;" style="verticalAlign=top;align=center;whiteSpace=wrap;html=1;rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" vertex="1" parent="g_db">
+          <mxGeometry x="710" y="290" width="240" height="240" as="geometry" />
+        </mxCell>
+
+        <!-- digests table -->
+        <mxCell id="db_digests" value="&lt;b style=&quot;font-size:13px&quot;&gt;📊 digests&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;color:#999&quot;&gt;日报表 — 每日总结&lt;/span&gt;&lt;hr&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:10px&quot;&gt;&lt;b&gt;PK&lt;/b&gt; id (UUID)&lt;br&gt;&lt;b&gt;FK&lt;/b&gt; user_id → users.id&lt;br&gt;date (Date)&lt;br&gt;score (0~100 生活评分)&lt;br&gt;highlights (JSON — 亮点)&lt;br&gt;problems (JSON — 问题)&lt;br&gt;suggestions (JSON — 建议)&lt;br&gt;trends (JSON — 趋势)&lt;br&gt;created_at&lt;br&gt;&lt;br&gt;&lt;i style=&quot;color:#b85450&quot;&gt;⚠ 无写入 API, 仅 mock 种子&lt;br&gt;(设计预期: AI 汇总当日事件生成)&lt;/i&gt;&lt;/div&gt;" style="verticalAlign=top;align=center;whiteSpace=wrap;html=1;rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" vertex="1" parent="g_db">
+          <mxGeometry x="1040" y="290" width="240" height="240" as="geometry" />
+        </mxCell>
+
+        <!-- FK relationship legend box -->
+        <mxCell id="db_legend" value="&lt;b&gt;表关系 (1:N)&lt;/b&gt;&lt;hr style=&quot;font-size:10px&quot;&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:10px&quot;&gt;users 1:N events&lt;br&gt;users 1:N finance_txns&lt;br&gt;users 1:N insights&lt;br&gt;users 1:N digests&lt;br&gt;&lt;br&gt;子表之间无直接关联&lt;br&gt;events 可间接触发&lt;br&gt;finance_txns 生成&lt;/div&gt;" style="verticalAlign=top;align=center;whiteSpace=wrap;html=1;rounded=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontSize=11;" vertex="1" parent="g_db">
+          <mxGeometry x="1340" y="50" width="200" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== EDGES: FK relationships ==================== -->
+        <mxCell id="fk_events" value="1:N&#10;user_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeColor=#82b366;strokeWidth=2;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="g_db" source="db_users" target="db_events">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fk_finance" value="1:N&#10;user_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;exitX=0.4;exitY=1;entryX=0.5;entryY=0;strokeColor=#82b366;strokeWidth=2;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="g_db" source="db_users" target="db_finance">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fk_insights" value="1:N&#10;user_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;exitX=0.6;exitY=1;entryX=0.5;entryY=0;strokeColor=#82b366;strokeWidth=2;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="g_db" source="db_users" target="db_insights">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fk_digests" value="1:N&#10;user_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;exitX=0.7;exitY=1;entryX=0.5;entryY=0;strokeColor=#82b366;strokeWidth=2;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="g_db" source="db_users" target="db_digests">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== EDGES: Input → API ==================== -->
+        <mxCell id="e_frontend_api" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#9673a6;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="in_frontend" target="g_api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_voice_in" value="audio" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;strokeWidth=2;endArrow=block;fontSize=9;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="in_voice" target="api_voice">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_text_events" value="content" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;strokeWidth=2;endArrow=block;fontSize=9;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="in_text" target="api_events">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== EDGES: API → AI ==================== -->
+        <mxCell id="e_voice_whisper" value="base64 audio" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;fontSize=9;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="api_voice" target="ai_whisper">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_whisper_intent" value="text" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;fontSize=9;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="ai_whisper" target="ai_intent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_events_parser" value="content" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;fontSize=9;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="api_events" target="ai_event">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_finance_parser" value="content" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;fontSize=9;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="api_finance" target="ai_finance">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- AI client connections -->
+        <mxCell id="e_whisper_client" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=1;dashed=1;endArrow=block;" edge="1" parent="1" source="ai_whisper" target="ai_client">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_intent_client" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=1;dashed=1;endArrow=block;" edge="1" parent="1" source="ai_intent" target="ai_client">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_event_client" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=1;dashed=1;endArrow=block;" edge="1" parent="1" source="ai_event" target="ai_client">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_finance_client" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=1;dashed=1;endArrow=block;" edge="1" parent="1" source="ai_finance" target="ai_client">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== EDGES: AI → DB (data generation) ==================== -->
+        <mxCell id="e_parser_events" value="INSERT&#10;结构化事件" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;endArrow=block;fontSize=10;fontStyle=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="ai_event" target="db_events">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Cross-trigger: event parser detects finance intent → finance parser -->
+        <mxCell id="e_event_to_finance" value="detect_finance_intent()=True&#10;自动二次调用" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;fontSize=9;fontStyle=1;labelBackgroundColor=#fff2cc;dashed=1;" edge="1" parent="1" source="ai_event" target="ai_finance">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_fparser_finance" value="INSERT&#10;结构化财务" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;endArrow=block;fontSize=10;fontStyle=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="ai_finance" target="db_finance">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- mock data seeding -->
+        <mxCell id="e_mock_db" value="种子数据&#10;INSERT (users/events/&#10;finance/insights/digests)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#999999;strokeWidth=2;endArrow=block;fontSize=9;dashed=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="in_mock" target="g_db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Board reads from multiple tables -->
+        <mxCell id="e_board_read" value="聚合查询&#10;(events+insights+digests)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;strokeWidth=2;endArrow=block;fontSize=9;labelBackgroundColor=#ffffff;startArrow=block;startFill=1;" edge="1" parent="1" source="db_events" target="api_board">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== LEGEND ==================== -->
+        <mxCell id="legend_box" value="&lt;b&gt;图例 / Legend&lt;/b&gt;" style="swimlane;fontSize=12;fontStyle=1;align=left;spacingLeft=8;startSize=24;horizontal=1;fillColor=#ffffff;strokeColor=#999999;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1200" width="1620" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="🟦 API 路由" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="legend_box">
+          <mxGeometry x="20" y="30" width="120" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="🟨 AI 服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="legend_box">
+          <mxGeometry x="160" y="30" width="120" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="🟩 数据表" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="legend_box">
+          <mxGeometry x="300" y="30" width="120" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="🟥 用户输入" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="legend_box">
+          <mxGeometry x="440" y="30" width="120" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="⬜ LLM 调用 (OpenAI/DeepSeek)" style="text;html=1;align=left;fontSize=11;" vertex="1" parent="legend_box">
+          <mxGeometry x="580" y="30" width="220" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6" value="━ ━ 虚线 = 种子/间接触发&#10;━━ 实线 = 主数据流" style="text;html=1;align=left;fontSize=11;" vertex="1" parent="legend_box">
+          <mxGeometry x="820" y="28" width="260" height="40" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>selfsec 架构 v1</title>
+<style>
+:root{
+  --ink:#1F2933; --ink2:#52606D; --ink3:#8A96A3; --line:#E3E8EE; --bg:#F7F9FB; --card:#FFFFFF;
+  --blue:#6C8EBF; --blue-bg:#DAE8FC; --blue-t:#EDF3FC;
+  --green:#82B366; --green-bg:#D5E8D4; --green-t:#EEF7ED;
+  --purple:#9673A6; --purple-bg:#E1D5E7; --purple-t:#F5F0F8;
+  --orange:#D79B00; --orange-bg:#FFE6CC; --orange-t:#FFF7EC;
+  --yellow:#D6B656; --yellow-bg:#FFF2CC; --yellow-t:#FFFBEF;
+  --red:#B85450; --red-bg:#F8CECC; --red-t:#FDF0EF;
+  --grey:#5A6472; --grey-bg:#F5F5F5; --grey-t:#F7F8FA;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg); color:var(--ink); font-size:14px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.page{max-width:1660px;margin:0 auto;padding:24px 20px 60px}
+
+/* ---------- header ---------- */
+header{margin-bottom:18px}
+h1{margin:0 0 4px;font-size:23px;letter-spacing:-.2px}
+.sub{margin:0;color:var(--ink2);font-size:13.5px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:12px;color:var(--ink2)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid rgba(0,0,0,.18)}
+
+/* ---------- layout ---------- */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:20px;align-items:start}
+@media(max-width:1180px){.grid{grid-template-columns:1fr}}
+
+/* ---------- band ---------- */
+.band{border-radius:14px;padding:12px 14px 14px;border:1.5px solid var(--line);background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.band > .cap{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
+.band > .cap b{font-size:14.5px;font-weight:700}
+.band > .cap span{font-size:12px;color:var(--ink3)}
+.band.blue{background:var(--blue-t);border-color:#C7D9F0}
+.band.green{background:var(--green-t);border-color:#C8E0C6}
+.band.purple{background:var(--purple-t);border-color:#DBCCE4}
+.band.orange{background:var(--orange-t);border-color:#F2DCC0}
+.band.yellow{background:var(--yellow-t);border-color:#EFE0B8}
+.band.dashed{border-style:dashed}
+
+/* ---------- row of boxes ---------- */
+.row{display:flex;flex-wrap:wrap;gap:9px}
+.row.fill > *{flex:1 1 150px;min-width:130px}
+.box{border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.5;border:1.5px solid}
+.box b{display:block;font-size:13px;margin-bottom:2px;font-weight:700}
+.box small{color:var(--ink2);font-size:11.5px;display:block}
+.box.blue{background:var(--blue-bg);border-color:var(--blue)}
+.box.green{background:var(--green-bg);border-color:var(--green)}
+.box.purple{background:var(--purple-bg);border-color:var(--purple)}
+.box.orange{background:var(--orange-bg);border-color:var(--orange)}
+.box.yellow{background:var(--yellow-bg);border-color:var(--yellow)}
+.box.grey{background:#fff;border-color:var(--grey)}
+.box.ghost{background:#fff;border-color:#C7D9F0;border-style:dashed;opacity:.72}
+
+/* ---------- memory columns ---------- */
+.cols4{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+@media(max-width:900px){.cols4{grid-template-columns:repeat(2,1fr)}}
+.mem{background:var(--orange-bg);border:1.5px solid var(--orange);border-radius:10px;padding:10px 12px;font-size:11.8px;line-height:1.62}
+.mem h4{margin:0 0 3px;font-size:13px;color:#8A6300}
+.mem hr{border:none;border-top:1px solid rgba(215,155,0,.35);margin:7px 0}
+.mem dl{margin:0}
+.mem dt{color:#8A6300;font-weight:700;display:inline}
+.mem dd{margin:0 0 4px;color:#4A3A16}
+.mem .note{color:#7A6427;font-size:11.2px;display:block;margin-top:4px}
+
+/* ---------- arrows ---------- */
+.flow{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0}
+.flow .k{font-size:11px;color:var(--ink2);background:#fff;border:1px solid var(--line);border-radius:999px;padding:1px 9px}
+.flow .l{width:2px;height:16px;background:#CBD3DD}
+.flow .a{width:0;height:0;border-left:5.5px solid transparent;border-right:5.5px solid transparent;border-top:9px solid #CBD3DD;margin-top:-2px}
+.flow.dashed .l,.flow.dashed .k{border-style:dashed}
+.flow.dashed .a{opacity:.5}
+
+/* ---------- sidebar ---------- */
+aside{display:flex;flex-direction:column;gap:14px}
+.note-list{margin:0;padding-left:0;list-style:none;font-size:12.3px;color:var(--ink2);line-height:1.75}
+.note-list li{margin-bottom:3px}
+.note-list .to{color:var(--orange);font-weight:700}
+.kv{font-size:12.3px;line-height:1.8;color:var(--ink2)}
+.kv b{color:var(--ink)}
+.xref{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line);font-size:12px;color:var(--ink2)}
+.xref div{margin-bottom:2px}
+.arrowto{color:var(--orange);font-weight:700}
+
+/* ---------- footer ---------- */
+.foot{margin-top:22px;font-size:11.8px;color:var(--ink3);text-align:center}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>selfsec 架构 v1</h1>
+    <p class="sub">核心是一个对话接口 —— 唯一入口 <code>POST /api/chat</code>。输入来源多样，真正的难点在 Context 如何组装。</p>
+    <div class="legend">
+      <span><i style="background:#DAE8FC;border-color:#6C8EBF"></i>输入 / 调度</span>
+      <span><i style="background:#D5E8D4;border-color:#82B366"></i>核心接口 / 输出</span>
+      <span><i style="background:#E1D5E7;border-color:#9673A6"></i>Context 组装</span>
+      <span><i style="background:#FFE6CC;border-color:#D79B00"></i>记忆层</span>
+      <span><i style="background:#F5F5F5;border-color:#5A6472"></i>数据层</span>
+      <span><i style="background:#FFF2CC;border-color:#D6B656"></i>洞察线（外部系统）</span>
+      <span><i style="background:#F8CECC;border-color:#B85450"></i>LLM 服务</span>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- ==================== 主链 ==================== -->
+    <div class="main">
+
+      <div class="band blue dashed">
+        <div class="cap"><b>① 输入层</b><span>输入来源多样，全部收敛到一个接口</span></div>
+        <div class="row">
+          <div class="box blue"><b>聊天窗口（用户）</b><small>唯一主入口 · 无分类、无表单</small></div>
+          <div class="box blue"><b>定时触发</b><small>问候 / 内置调度</small></div>
+          <div class="box ghost"><b>语音输入（后置）</b><small>需 HTTPS</small></div>
+          <div class="box ghost"><b>预留入口</b><small>图片 / 第三方转发</small></div>
+        </div>
+      </div>
+
+      <div class="flow"><span class="k">输入</span><span class="l"></span><span class="a"></span></div>
+
+      <div class="band green">
+        <div class="cap"><b>② 对话接口</b><span>POST /api/chat —— 系统唯一入口</span></div>
+        <div class="row">
+          <div class="box green"><b>意图路由</b><small>记录 / 规划 / 问候 / 情绪 / 闲聊</small></div>
+          <div class="box green"><b>Context 构造器</b><small>记忆检索 + 组装</small></div>
+        </div>
+      </div>
+
+      <div class="flow"><span class="k">路由后</span><span class="l"></span><span class="a"></span></div>
+
+      <div class="band purple">
+        <div class="cap"><b>③ Context 组装</b><span>参考 Hermes / Claude Code：基础 context 长而稳定，动态部分全部来自记忆</span></div>
+        <div class="cols4">
+          <div class="box purple"><b>System Prompt</b><small>身份 / 核心目的 / 边界<br>长且稳定</small></div>
+          <div class="box orange"><b>Memory Block</b><small>画像 + 统计 + 洞察<br>动态注入</small></div>
+          <div class="box purple"><b>当前 User Message</b><small>本次输入</small></div>
+          <div class="box yellow"><b>洞察上下文</b><small>外部世界变化<br>对计划的影响</small></div>
+        </div>
+      </div>
+
+      <div class="flow"><span class="k">↕ 读 / 写记忆</span><span class="l"></span><span class="a"></span></div>
+
+      <div class="band orange">
+        <div class="cap"><b>④ 记忆层</b><span>本项目真正的技术核心</span></div>
+        <div class="cols4">
+          <div class="mem">
+            <h4>4.1 长期画像 ·「总结意识」</h4>
+            <hr>
+            <dl>
+              <dd><dt>触发：</dt>每日定时 / 新增 N 条事件 / 手动</dd>
+              <dd><dt>处理：</dt>扫描该用户全部事件 → LLM 压成一段精炼画像</dd>
+              <dd><dt>形式：</dt>单用户单行文本（参考 Hermes user.md）</dd>
+            </dl>
+            <span class="note">慢变、低成本、全 context 注入</span>
+          </div>
+          <div class="mem">
+            <h4>4.2 事实与统计</h4>
+            <hr>
+            <dl>
+              <dd><dt>聚合 SQL：</dt>本周运动次数</dd>
+              <dd><dt>对比 SQL：</dt>环比上周 / 上月</dd>
+              <dd><dt>全量历史：</dt>单用户数据量小，可直接取用</dd>
+            </dl>
+            <span class="note">不过 LLM，实时查 —— 供「比较档」回应："这周第三次，比上周多"</span>
+          </div>
+          <div class="mem">
+            <h4>4.3 洞察记忆</h4>
+            <hr>
+            <dl>
+              <dd><dt>来源：</dt>Hermes 推送</dd>
+              <dd><dt>内容：</dt>市场 / 行业 / 天气 / 行情（股票线后续抛弃）</dd>
+              <dd><dt>作用：</dt>外部变化 → 对当前计划的影响</dd>
+            </dl>
+            <span class="note">外部驱动写入，不可自造</span>
+          </div>
+          <div class="mem">
+            <h4>4.4 会话短期</h4>
+            <hr>
+            <dl>
+              <dd><dt>范围：</dt>最近 N 轮对话</dd>
+              <dd><dt>作用：</dt>指代消解（"那个""上次说的那件事"）</dd>
+            </dl>
+            <span class="note">边界：不无限增长，不做自由陪聊</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow"><span class="k">↕ 读写</span><span class="l"></span><span class="a"></span></div>
+
+      <div class="band" style="background:#F7F8FA">
+        <div class="cap"><b>⑤ 数据层</b></div>
+        <div class="cols4">
+          <div class="box grey"><b>events</b><small>进来的东西<br>（用户 / Hermes）</small></div>
+          <div class="box grey"><b>messages</b><small>它说的话<br>（所有回应）</small></div>
+          <div class="box grey"><b>plans</b><small>待办 / 目标</small></div>
+          <div class="box grey"><b>memory_profile</b><small>长期画像（单行 · 可版本化）</small></div>
+        </div>
+      </div>
+
+      <div class="flow"><span class="k">回应</span><span class="l"></span><span class="a"></span></div>
+
+      <div class="band green">
+        <div class="cap"><b>⑥ 输出</b><span>回到同一个窗口 —— 不自开页面</span></div>
+        <div class="row">
+          <div class="box green"><b>一句话回应</b><small>永远回应，不可省</small></div>
+          <div class="box green"><b>卡片</b><small>记录 / 计划 / 问候 / 洞察</small></div>
+        </div>
+        <div class="xref">↩ 虚线回连：输出回到「聊天窗口」，形成同窗口闭环</div>
+      </div>
+
+    </div>
+
+    <!-- ==================== 侧栏 ==================== -->
+    <aside>
+
+      <div class="band yellow">
+        <div class="cap"><b>⑦ 洞察线（外部系统）</b><span>不自建抓取</span></div>
+        <div class="row fill">
+          <div class="box yellow"><b>Hermes 定时任务</b><small>cron</small></div>
+          <div class="box yellow"><b>抓取 + 筛选 + 去重</b></div>
+          <div class="box yellow"><b>POST /api/insights</b><small>回调 selfsec</small></div>
+          <div class="box yellow"><b>落库 events(source=hermes)</b></div>
+        </div>
+        <div class="row" style="margin-top:9px">
+          <div class="box yellow" style="flex:1"><b>生成 messages(kind=insight) → 窗口内出现洞察卡</b></div>
+        </div>
+        <div class="xref">
+          <div><span class="arrowto">→</span> ⑤ 数据层：落库 + 生成 message</div>
+          <div><span class="arrowto">→</span> 4.3 洞察记忆：写入</div>
+        </div>
+      </div>
+
+      <div class="band" style="background:#FDF0EF;border-color:#EBC3C1">
+        <div class="cap"><b>LLM 服务（DeepSeek）</b><span>OpenAI 兼容 SDK</span></div>
+        <div class="row">
+          <div class="box" style="flex:1;background:#F8CECC;border-color:#B85450"><b>回应生成</b><small>对话接口调用</small></div>
+          <div class="box" style="flex:1;background:#F8CECC;border-color:#B85450"><b>摘要生成</b><small>4.1 总结意识调用</small></div>
+        </div>
+      </div>
+
+      <div class="band blue">
+        <div class="cap"><b>定时调度器</b></div>
+        <div class="kv">
+          · 早 8:00 / 晚 21:00 <b>问候</b><br>
+          · 21:00 <b>画像总结</b>（总结意识触发）<br>
+          <span style="color:#B85450">⚠ 待定：调度主体是它，还是 Hermes cron？</span>
+        </div>
+      </div>
+
+      <div class="band" style="background:#F7F8FA">
+        <div class="cap"><b>可观测指标</b><span>每个模块必须有</span></div>
+        <div class="kv">
+          · 记录：<b>连续记录天数</b><br>
+          · 问候：<b>次日回应率</b><br>
+          · 洞察：<b>卡片点击率</b><br>
+          · 抚慰：<b>暂缺</b>（不可验证，标为实验性）
+        </div>
+      </div>
+
+      <div class="band dashed" style="background:#FDEBEB;border-color:#E0A9A6">
+        <div class="cap"><b>明确不做（边界）</b></div>
+        <ul class="note-list">
+          <li>· 自由多轮陪聊（无边界对话）</li>
+          <li>· 自建抓取管线（RSS / 爬虫 / 聚类）</li>
+          <li>· 趋势图表 / 日报评分 / 资产分布</li>
+          <li>· 多用户 / 注册登录</li>
+          <li>· 语音输入（需 HTTPS，后置）</li>
+        </ul>
+      </div>
+
+    </aside>
+  </div>
+
+  <div class="foot">selfsec 架构 v1 · 待 review 后修订 · 对应 docs/架构-v1.drawio</div>
+</div>
+</body>
+</html>
