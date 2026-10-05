@@ -2,18 +2,18 @@
 
 v1：每条用户消息 = 一条 events(source=user)；messages 只放秘书说的话。
 v2：messages 放窗口里的**全部**消息（role=me/secretary）；
-    events 只放**同一天合并后的事件**。
+    events 只放**事件**（以后同一天的重复 / 补充会自动合并进来）。
 
 做的事：
   1. messages 加 role 列（已有就跳过），旧行标成 secretary
   2. events 加 occurred_on / tags / last_at / merged_count（已有就跳过）并回填
-  3. 若窗口里还没有「我说的」消息：把 events(source=user) 按天分组——
-       每组的第一条留作那个事件；组内全部原话搬进 messages(role=me) 并指向它；
-       被合并掉的 events 行删除，plans / messages 里指向它们的引用改指到保留的那条
-  4. 打印前后统计
+  3. 若窗口里还没有「我说的」消息：把 events(source=user) 一条一条搬进
+     messages(role=me)，并指向它自己那条事件
 
-注意：第 3 步是机械合并（原话用"；"拼起来，标签留空），不会调用模型。
-     想要漂亮的合并表述，迁移之后在页面上补一句、或点一次「重算画像」即可。
+**刻意不做跨消息合并**：v1 每行是模型当时判定的"一条记录"，哪几条属于同一件事的信息
+已经没了；按天机械合并会把「跑步」和「想念」揉成一条（线上真实数据就是这样）。
+合并是给**以后**的新输入用的——迁移完的历史事件照样在"今天已有的事件"候选里，
+新消息该并进哪条，由模型判断。
 
 用法：cd backend && python migrate_v2.py
 """
@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -33,7 +32,6 @@ from sqlalchemy import func, inspect, select, text  # noqa: E402
 from app.database import async_session, engine  # noqa: E402
 from app.models.event import SOURCE_USER, Event  # noqa: E402
 from app.models.message import KIND_USER, ROLE_ME, Message  # noqa: E402
-from app.models.plan import Plan  # noqa: E402
 from app.utils import now_local  # noqa: E402
 
 MYSQL = engine.dialect.name == "mysql"
@@ -116,44 +114,23 @@ async def migrate_data() -> None:
             print("  没有用户事件需要搬迁")
             return
 
-        groups: dict = defaultdict(list)
         for e in rows:
-            groups[e.occurred_on or e.recorded_at.date()].append(e)
-
-        moved, removed = 0, 0
-        for day, group in sorted(groups.items()):
-            keep, texts = group[0], []
-            for e in group:
-                db.add(
-                    Message(
-                        user_id=e.user_id,
-                        role=ROLE_ME,
-                        kind=KIND_USER,
-                        content=e.content,
-                        ref_event_id=keep.id,
-                        created_at=e.recorded_at,
-                    )
+            db.add(
+                Message(
+                    user_id=e.user_id,
+                    role=ROLE_ME,
+                    kind=KIND_USER,
+                    content=e.content,
+                    ref_event_id=e.id,
+                    created_at=e.recorded_at,
                 )
-                texts.append(e.content)
-                moved += 1
-
-            keep.occurred_on = day
-            keep.merged_count = len(group)
-            keep.last_at = group[-1].recorded_at
-            if len(group) > 1:
-                keep.content = "；".join(texts)
-
-            for dup in group[1:]:
-                # 引用改指到保留的那条，再删掉多余的
-                for m in (await db.execute(select(Message).where(Message.ref_event_id == dup.id))).scalars().all():
-                    m.ref_event_id = keep.id
-                for p in (await db.execute(select(Plan).where(Plan.ref_event_id == dup.id))).scalars().all():
-                    p.ref_event_id = keep.id
-                await db.delete(dup)
-                removed += 1
+            )
+            e.occurred_on = e.recorded_at.date() if e.recorded_at else e.occurred_on
+            e.last_at = e.recorded_at
+            e.merged_count = 1
 
         await db.commit()
-        print(f"  搬迁 {moved} 条原话进 messages(role=me)，合并掉 {removed} 条冗余事件")
+        print(f"  搬迁 {len(rows)} 条原话进 messages(role=me)；历史事件一条对一条，不做跨消息合并")
 
 
 async def main() -> None:
@@ -168,7 +145,7 @@ async def main() -> None:
 
     after = await _counts()
     print(f"\n  迁移后：{after}")
-    print("\n完成。窗口渲染现在只读 messages；events 只剩「合并后的事件」+ 外部洞察。")
+    print("\n完成。窗口渲染现在只读 messages；events 只剩「事件」+ 外部洞察。")
     await engine.dispose()
 
 
