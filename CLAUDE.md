@@ -21,7 +21,8 @@
 cd backend
 
 # 依赖（Windows 用 conda 环境 life-secretary，Python 3.11）
-pip install -r requirements.txt
+# 直连 pypi.org 在本机会被重置，装包一律带镜像源（和 Dockerfile 里是同一个源）
+pip install -i https://mirrors.aliyun.com/pypi/simple -r requirements.txt
 
 # 配置：复制 .env.example 为 .env
 #   不设 DATABASE_URL 就走 SQLite（./selfsec.db），无需装数据库
@@ -31,7 +32,9 @@ python startup.py                              # 启动（等 DB → 建表 → 
 python smoke_test.py                           # 端到端冒烟测试（用 SQLite，不碰生产库）
 python -m uvicorn app.main:app --port 8123     # 直接起服务
 
-docker compose up -d --build                   # 远程部署（api + mysql）
+# 远程部署（api + mysql）：容器内构建默认走阿里云 pip 源
+# （backend/Dockerfile 的 ARG PIP_INDEX_URL 可覆盖，compose 的 build.args 也走这里）
+docker compose up -d --build
 ```
 
 表结构与锚点用户由 `app/main.py` 的 lifespan 自动创建，**没有种子 SQL、没有迁移工具**。

@@ -18,7 +18,7 @@ selfsec 的设计约束只有一条：**每次输入都必须换来一句话**�
 
 ```bash
 cd backend
-pip install -r requirements.txt
+pip install -i https://mirrors.aliyun.com/pypi/simple -r requirements.txt   # 直连 pypi.org 在国内很慢
 cp .env.example .env        # 填 OPENAI_API_KEY；不填 DATABASE_URL 就走本地 SQLite
 python startup.py           # http://localhost:8000
 ```
