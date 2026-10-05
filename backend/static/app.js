@@ -45,19 +45,36 @@ function getToken() {
   return localStorage.getItem('selfsec_token') || '';
 }
 
-async function api(path, opts = {}) {
+// 并发请求可能同时收到 401（loadAll 一次发两个请求），共用一个输入过程，只问一次
+let askingToken = null;
+
+function askToken() {
+  if (!askingToken) {
+    askingToken = Promise.resolve(prompt('服务端已开启鉴权，请输入 API Token（只需一次）'))
+      .then((input) => {
+        if (!input || !input.trim()) throw new Error('未提供 Token');
+        localStorage.setItem('selfsec_token', input.trim());
+      })
+      .finally(() => {
+        askingToken = null;
+      });
+  }
+  return askingToken;
+}
+
+async function api(path, opts = {}, retried = false) {
+  const used = getToken();                       // 这次请求实际用的 token
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  const tk = getToken();
-  if (tk) headers['X-API-Token'] = tk;
+  if (used) headers['X-API-Token'] = used;
 
   const res = await fetch(path, { ...opts, headers });
+
   if (res.status === 401) {
-    const input = prompt('服务端已开启鉴权，请输入 API Token（只需一次）');
-    if (input) {
-      localStorage.setItem('selfsec_token', input.trim());
-      return api(path, opts);
-    }
-    throw new Error('未提供 Token');
+    if (retried) throw new Error('API Token 无效');
+    // 另一个并发请求刚把新 token 写进去了 —— 直接用它重试，不再多问一次
+    if (getToken() !== used) return api(path, opts, true);
+    await askToken();
+    return api(path, opts, true);
   }
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
   return res.status === 204 ? null : res.json();
