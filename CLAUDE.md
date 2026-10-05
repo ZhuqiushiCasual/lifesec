@@ -89,8 +89,12 @@ plans           待办 / 目标，从对话里长出来，可勾选
 memory_profile  长期画像，单用户单行，version 递增
 ```
 
-**时间戳用 Python 侧 `default=now_local`，不是 `func.now()`。**
-后者只到「秒」，同一秒内落库的多条记录时间戳相同，`ORDER BY` 会不稳定（消息流会错序）。
+**时间戳统一用 `app/database.py` 的 `DateTimeMicro`（`DateTime` + MySQL 侧的 `DATETIME(6)`），
+默认值用 Python 侧 `default=now_local`，不是 `func.now()`。**
+MySQL 的 `DATETIME` 默认精度只到「秒」，同一秒内落库的多条记录时间戳完全相同，`ORDER BY` 定不出先后
+（表现为「它的回应显示在我发送的消息上面」）；`DateTimeMicro` 让 MySQL 侧建出 `DATETIME(6)`，
+其它方言保持普通 `DateTime`（SQLite 本来就存到微秒）。**老库要手动跑 `docs/alter-datetime6.sql`**，
+`create_all` 只建缺失的表、不会 ALTER 已有表。
 
 ## 与 Hermes 的边界
 
@@ -105,14 +109,19 @@ memory_profile  长期画像，单用户单行，version 递增
 - **AI 调用只放在 `services/ai/`**（`client.py` 统一出口，失败抛 `AIUnavailable`，调用方必须降级）
 - 任何 LLM 失败都不能让用户看到报错——回应生成有本地兜底（"记下了。"）
 - 前端保持零依赖零构建：不引入框架/打包器；卡片样式统一在 `styles.css`
+- 窗口流（`api/messages.py`）把 events 与 messages 归并成一条时间线，排序键是 `(created_at, 轮次, id)`：
+  **同一时刻下用户轮必须排在秘书轮前面**。不能"降序排 → 截断 → 整体 reverse"，那会把并列项翻过来
+- 前端 `api()` 里 401 的处理必须**并发安全**：`loadAll` 一次发两个请求，两个都可能拿到 401，
+  只允许弹一次 Token 输入框（并发请求共用一个输入过程 + 用当前 token 静默重试）
 - 响应错误保持 `{"detail": "..."}` 风格
 
 ## 已知限制 / 注意点
 
 1. **改表结构需重建库**：无 Alembic，`create_all` 只建缺失的表、不会 ALTER 已有表。
-   从旧版升级（旧库有 `finance_txns` / `insights` / `digests`）**必须换新库**
+   从旧版升级（旧库有 `finance_txns` / `insights` / `digests`）**必须换新库**；
+   时间戳精度升级（`DATETIME` → `DATETIME(6)`）要手动跑 `docs/alter-datetime6.sql`
 2. **`backend/.env` 里现在指向的是旧的远程库**，且是旧表结构 —— 用之前先确认/更换 `DATABASE_URL`
-3. **无测试框架**，只有 `smoke_test.py`（26 项断言，端到端，离线可跑）
+3. **无测试框架**，只有 `smoke_test.py`（29 项断言，端到端，离线可跑；含同秒并列的次序回归）
 4. **secrets 曾入库**：旧版 `config.py` 硬编码过 DB 密码与 DeepSeek key（仍在 git 历史），建议轮换
 5. **抚慰（P2）尚未实现**：`route()` 已识别情绪词并给模型提示，但没有独立的抚慰议程
 6. **PWA 已移除**：`sw.js` / `manifest` / icons 已删，浏览器麦克风仍需 HTTPS

@@ -6,10 +6,10 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Date, DateTime, ForeignKey, String
+from sqlalchemy import Date, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, DateTimeMicro
 from app.utils import now_local
 
 STATUS_OPEN = "open"
@@ -26,5 +26,5 @@ class Plan(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default=STATUS_OPEN, comment="open / done")
     due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     ref_event_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_local)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_local, onupdate=now_local)
+    created_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local)
+    updated_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local, onupdate=now_local)

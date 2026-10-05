@@ -11,10 +11,10 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy import ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, DateTimeMicro
 from app.utils import now_local
 
 # source 取值
@@ -45,6 +45,7 @@ class Event(Base):
     dedup_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
 
     # 用 Python 侧默认值而不是 func.now()：后者只到「秒」，
-    # 同一秒内落库的多条记录时间戳相同，ORDER BY 会不稳定
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=now_local, index=True, comment="事件发生时间")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_local, comment="记录创建时间")
+    # 同一秒内落库的多条记录时间戳相同，ORDER BY 会不稳定；
+    # 配合 DateTimeMicro（MySQL 侧 DATETIME(6)）才有足够分辨率
+    recorded_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local, index=True, comment="事件发生时间")
+    created_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local, comment="记录创建时间")

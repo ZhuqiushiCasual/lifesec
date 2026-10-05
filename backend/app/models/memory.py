@@ -9,10 +9,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, DateTimeMicro
 from app.utils import now_local
 
 
@@ -25,4 +25,4 @@ class MemoryProfile(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False, default="", comment="画像正文（一段话）")
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="版本号，每次重算 +1")
     event_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="生成时依据的事件数（用于阈值判断）")
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_local, onupdate=now_local)
+    updated_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local, onupdate=now_local)

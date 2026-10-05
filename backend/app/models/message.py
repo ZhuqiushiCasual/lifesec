@@ -10,10 +10,10 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy import ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, DateTimeMicro
 from app.utils import now_local
 
 # kind 取值
@@ -33,5 +33,5 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False, comment="回应正文（一句话）")
     card: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="附带的卡片（JSON，可空）")
     ref_event_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, comment="关联事件（不设外键，避免牵连删除）")
-    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, comment="已读时间")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_local, index=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTimeMicro, nullable=True, comment="已读时间")
+    created_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local, index=True)

@@ -131,6 +131,34 @@ async def run() -> None:
         insight_msgs = [m for m in msgs if m["kind"] == "insight"]
         check("洞察卡已附在消息上", bool(insight_msgs) and insight_msgs[0]["card"]["kind"] == "insight")
 
+        print("\n[6b] 同一时刻并列时的次序（MySQL DATETIME 默认只到秒，两条会完全相等）")
+        from datetime import datetime as _dt
+
+        from app.database import async_session
+        from app.models.event import SOURCE_USER, TYPE_RECORD, Event
+        from app.models.message import KIND_REPLY, Message
+        from app.services.deps import DEFAULT_USER_ID
+        from app.utils import now_local
+
+        tie_at = now_local()
+        async with async_session() as db:
+            db.add(Event(user_id=DEFAULT_USER_ID, source=SOURCE_USER, type=TYPE_RECORD,
+                         content="并列序测试·用户轮", created_at=tie_at))
+            db.add(Message(user_id=DEFAULT_USER_ID, kind=KIND_REPLY,
+                           content="并列序测试·秘书轮", created_at=tie_at))
+            await db.commit()
+
+        msgs = (await c.get("/api/messages?limit=200")).json()
+        paired = [m["role"] for m in msgs if _dt.fromisoformat(m["created_at"]) == tie_at]
+        check("同秒并列时用户轮排在秘书轮前面", paired == ["me", "secretary"], str(paired))
+        check("整条流仍按时间正序",
+              all(msgs[i]["created_at"] <= msgs[i + 1]["created_at"] for i in range(len(msgs) - 1)))
+
+        print("\n[6c] 回溯是倒序时，并列项仍保持「先我后它」被反过来读")
+        back = (await c.get("/api/messages?filter=all&order=desc&limit=200")).json()
+        back_pair = [m["role"] for m in back if _dt.fromisoformat(m["created_at"]) == tie_at]
+        check("倒序时秘书轮在用户轮之前（最新在上）", back_pair == ["secretary", "me"], str(back_pair))
+
         print("\n[7] 内置调度（手动触发）")
         before = len(msgs)
         await scheduler.fire("morning")

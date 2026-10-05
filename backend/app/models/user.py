@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, DateTimeMicro
 from app.utils import now_local
 
 
@@ -17,4 +17,4 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, comment="用户 UUID")
     name: Mapped[str] = mapped_column(String(100), nullable=False, default="我", comment="昵称")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_local, comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local, comment="创建时间")
