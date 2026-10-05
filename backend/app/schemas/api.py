@@ -25,6 +25,8 @@ class ChatResponse(BaseModel):
     reply: str
     card: Optional[Card] = None
     message_id: str
+    event_id: Optional[str] = None    # 这条输入归入/新建的事件
+    merged: bool = False              # 是并入了今天已有的事件，还是新建了一条
 
 
 # ── POST /api/insights（Hermes 回调）──────────────────────
@@ -47,14 +49,17 @@ class InsightOut(BaseModel):
     message_id: Optional[str] = None
 
 
-# ── GET /api/messages（窗口流：用户轮 + 秘书轮合并）──────────
+# ── GET /api/messages（窗口流 / 回溯）─────────────────────
 class StreamItemOut(BaseModel):
     id: str
-    role: str        # me | secretary
-    kind: str        # user / reply / greeting / insight / nudge
+    role: str                        # me | secretary | event
+    kind: str                        # user / reply / greeting / insight / nudge | record / plan / ...
     content: str
     card: Optional[Card] = None
-    created_at: datetime
+    tags: list[str] = Field(default_factory=list)   # 事件才带（AI 生成的标签）
+    merged_count: int = 1            # 事件才带：这一天里被合并进来的消息条数
+    occurred_on: Optional[date] = None              # 事件才带：归属日期
+    created_at: datetime             # 消息=说话时间点；事件=第一次记到它的时间点
 
 
 # ── /api/plans ────────────────────────────────────────────

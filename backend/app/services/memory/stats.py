@@ -3,6 +3,9 @@
 **这一层不过 LLM。** 它回答的是"多少次""比上周多吗"这类确定性问题，
 用 SQL 直接算，又快又不会说谎。
 
+统计对象是**事件**（同一天合并后的结果），不是消息条数——
+所以"今天记了 3 件"指的是 3 件事，而不是说了 3 句话。
+
 它是「比较档」回应的数据来源：
     确认档  "记下了"
     比较档  "这周第三次，比上周多"   ← 这一层提供
@@ -11,6 +14,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import timedelta
 
 from sqlalchemy import func, select
@@ -29,7 +33,7 @@ TYPE_LABELS = {
 
 
 async def collect(db: AsyncSession, user_id: str, days: int = 7) -> dict:
-    """本周 / 上周的对比统计 + 按类型分布 + 连续记录天数。只统计用户自己产生的。"""
+    """本周 / 上周的对比统计 + 按类型分布 + 常用标签 + 连续记录天数。只统计用户自己产生的。"""
     now = now_local()
     week_start = now - timedelta(days=days)
     last_week_start = now - timedelta(days=days * 2)
@@ -55,10 +59,19 @@ async def collect(db: AsyncSession, user_id: str, days: int = 7) -> dict:
     )
     by_type = {t: c for t, c in rows.all()}
 
+    # 标签统计：tags 是 JSON 数组，各库的聚合函数不一样，取回来在 Python 侧数
+    # （单用户、一周的事件量很小，这样做最省事也最可移植）
+    tag_rows = await db.execute(select(Event.tags).where(*base, Event.recorded_at >= week_start))
+    counter: Counter = Counter()
+    for (tags,) in tag_rows.all():
+        for t in tags or []:
+            counter[str(t)] += 1
+    by_tag = counter.most_common(3)
+
     # 连续记录天数：取最近 60 天的活跃日期，从今天往前数
     date_rows = await db.execute(
         select(func.date(Event.recorded_at))
-        .where(*base, Event.recorded_at >= now - timedelta(days=60))
+        .where(*base, Event.recorded_at >= now - timedelta(days=days * 8))
         .group_by(func.date(Event.recorded_at))
     )
     active = {str(r[0]) for r in date_rows.all()}
@@ -72,6 +85,7 @@ async def collect(db: AsyncSession, user_id: str, days: int = 7) -> dict:
         "last_week_total": last_week_total,
         "today_total": today_total,
         "by_type": by_type,
+        "by_tag": by_tag,
         "streak_days": streak,
     }
 
@@ -83,17 +97,21 @@ def render(s: dict) -> str:
 
     delta = s["week_total"] - s["last_week_total"]
     if delta > 0:
-        cmp_text = f"比上周多 {delta} 条"
+        cmp_text = f"比上周多 {delta} 件"
     elif delta < 0:
-        cmp_text = f"比上周少 {abs(delta)} 条"
+        cmp_text = f"比上周少 {abs(delta)} 件"
     else:
         cmp_text = "和上周持平"
 
-    parts = [f"本周 {s['week_total']} 条，{cmp_text}"]
+    parts = [f"本周 {s['week_total']} 件，{cmp_text}"]
 
     if s["by_type"]:
         top = "、".join(f"{TYPE_LABELS.get(k, k)} {v}" for k, v in list(s["by_type"].items())[:3])
         parts.append(f"其中 {top}")
+
+    if s.get("by_tag"):
+        tags = "、".join(f"{t} {c}" for t, c in s["by_tag"])
+        parts.append(f"常提到 {tags}")
 
     if s["streak_days"] > 1:
         parts.append(f"已连续记录 {s['streak_days']} 天")

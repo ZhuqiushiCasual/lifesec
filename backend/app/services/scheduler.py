@@ -6,7 +6,8 @@
     早 morning_hour  问候（议程三问）
     晚 evening_hour  今日小结 + 强制重算画像
 
-对应架构图：调度器 →（定时触发）→ 意图路由，问候走的是同一条对话管道。
+对应架构图：调度器 →（定时触发）→ 意图路由，问候走的是同一条对话管道
+（问候也落进同一个窗口表 messages，只是 role=secretary）。
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.database import async_session
-from app.models.message import KIND_GREETING, Message
+from app.models.message import KIND_GREETING, ROLE_SECRETARY, Message
 from app.models.user import User
 from app.services.deps import DEFAULT_USER_ID, DEFAULT_USER_NAME
 from app.services.memory import profile as mem_profile
@@ -47,6 +48,7 @@ async def _morning(db) -> None:
     db.add(
         Message(
             user_id=user.id,
+            role=ROLE_SECRETARY,
             kind=KIND_GREETING,
             content="早。今天最重要的一件事是什么？",
             card={"kind": "greeting", "title": "早上好", "lines": MORNING_AGENDA, "meta": {}},
@@ -63,8 +65,9 @@ async def _evening(db) -> None:
     db.add(
         Message(
             user_id=user.id,
+            role=ROLE_SECRETARY,
             kind=KIND_GREETING,
-            content=f"今天记了 {stat_data['today_total']} 条。",
+            content=f"今天记了 {stat_data['today_total']} 件。",
             card={"kind": "greeting", "title": "今天", "lines": [stats.render(stat_data)], "meta": {}},
         )
     )

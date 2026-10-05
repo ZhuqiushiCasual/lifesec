@@ -211,3 +211,17 @@ body{
   .row{max-width:90%}
   .composer{padding-left:13px;padding-right:13px}
 }
+
+/* ---------- 标签（AI 每次生成的那个） ---------- */
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.tag{
+  font-size:11.5px;font-weight:600;color:#8A6300;background:#FFF4E2;
+  border:1px solid #F3DFC2;border-radius:999px;padding:1px 9px;white-space:nowrap
+}
+.card.record .tag{color:#4E7A44;background:#EAF4E8;border-color:#CFE4CB}
+.card.plan .tag{color:#8A6300;background:#FFF3E0;border-color:#F2DCC0}
+.card.greeting .tag{color:#4A6C99;background:#EAF1FA;border-color:#CBDDF3}
+.card.insight .tag{color:#8C7000;background:#FBF0CE;border-color:#EFE0B8}
+.merged{margin-top:6px;font-size:12px;color:var(--warm-d)}
+.hcount{font-size:11px;color:var(--ink3);margin-left:6px}
+.hitem .tags{margin-top:6px}

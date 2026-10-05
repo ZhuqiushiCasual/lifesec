@@ -81,32 +81,44 @@ async function api(path, opts = {}, retried = false) {
 }
 
 /* ---------- 主窗口渲染 ---------- */
+function tagChips(tags) {
+  const list = (tags || []).filter(Boolean);
+  if (!list.length) return '';
+  return `<div class="tags">${list.map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</div>`;
+}
+
 function cardHTML(card) {
   if (!card) return '';
   const kind = ['record', 'plan', 'greeting', 'insight'].includes(card.kind) ? card.kind : 'record';
+  const meta = card.meta || {};
   const title = esc(card.title || '');
 
-  if (kind === 'plan' && card.meta && card.meta.plan_id) {
-    const done = plans.find((p) => p.id === card.meta.plan_id)?.status === 'done';
+  if (kind === 'plan' && meta.plan_id) {
+    const done = plans.find((p) => p.id === meta.plan_id)?.status === 'done';
     return `<div class="card plan">
       <h4>待办</h4>
-      <div class="plan-row${done ? ' done' : ''}" data-plan="${esc(card.meta.plan_id)}">
+      <div class="plan-row${done ? ' done' : ''}" data-plan="${esc(meta.plan_id)}">
         <div class="plan-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
         <div class="plan-title">${esc(card.title || '')}</div>
       </div>
+      ${tagChips(meta.tags)}
     </div>`;
   }
 
   const lines = (card.lines || []).filter(Boolean).map((l) => `<li>${esc(l)}</li>`).join('');
-  const url = card.meta && card.meta.source_url;
-  const srcName = card.meta && card.meta.source_name;
+  const url = meta.source_url;
   const src = url
-    ? `<div class="src">来源：<a href="${esc(url)}" target="_blank" rel="noreferrer">${esc(srcName || url)}</a></div>`
+    ? `<div class="src">来源：<a href="${esc(url)}" target="_blank" rel="noreferrer">${esc(meta.source_name || url)}</a></div>`
+    : '';
+  const merged = meta.merged
+    ? `<div class="merged">同一件事，第 ${esc(String(meta.merged_count || 2))} 次补充</div>`
     : '';
 
   return `<div class="card ${kind}">
     ${title ? `<h4>${title}</h4>` : ''}
     ${lines ? `<ul>${lines}</ul>` : ''}
+    ${tagChips(meta.tags)}
+    ${merged}
     ${src}
   </div>`;
 }
@@ -142,12 +154,17 @@ const D = { filter: 'all', items: [], cursor: null, done: false, loading: false 
 const PAGE = 30;
 
 function hitemHTML(m) {
-  const mine = m.role === 'me';
+  // role=event 是「合并后的事件」，role=me/secretary 是窗口里的原话与回应
   let cls = 'record';
-  let label = mine ? '记录' : '回应';
-  if (m.kind === 'insight') { cls = 'insight'; label = '洞察'; }
-  else if (m.kind === 'greeting') { label = '问候'; }
-  if (m.card && m.card.kind === 'plan') { cls = 'plan'; label = '待办'; }
+  let label = '我说';
+  if (m.role === 'event') {
+    label = m.kind === 'plan' ? '待办' : '事件';
+  } else if (m.role === 'secretary') {
+    if (m.kind === 'insight') { cls = 'insight'; label = '洞察'; }
+    else if (m.kind === 'greeting') label = '问候';
+    else label = '回应';
+  }
+  if (m.kind === 'feeling') cls = 'feeling';
 
   const card = m.card || {};
   const lines = card.lines || [];
@@ -158,10 +175,11 @@ function hitemHTML(m) {
   const link = url
     ? `<div class="hlink">来源：<a href="${esc(url)}" target="_blank" rel="noreferrer">${esc(card.meta.source_name || url)}</a></div>`
     : '';
+  const count = m.merged_count > 1 ? `<span class="hcount">合了 ${m.merged_count} 条消息</span>` : '';
 
   return `<div class="hitem ${cls}">
     <div class="htime">${hhmm(m.created_at)}</div>
-    <div class="hbody"><span class="hkind">${label}</span><div class="htext">${esc(text)}</div>${link}</div>
+    <div class="hbody"><span class="hkind">${label}</span>${count}<div class="htext">${esc(text)}</div>${tagChips(m.tags)}${link}</div>
   </div>`;
 }
 
@@ -248,7 +266,8 @@ async function send() {
   stream.scrollTop = stream.scrollHeight;
 
   try {
-    await api('/api/chat', { method: 'POST', body: JSON.stringify({ content }) });
+    const res = await api('/api/chat', { method: 'POST', body: JSON.stringify({ content }) });
+    if (res && res.merged) toast('并入了今天已有的一件事');
     await loadAll();
   } catch (e) {
     toast('发送失败：' + e.message);

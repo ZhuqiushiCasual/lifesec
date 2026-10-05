@@ -62,19 +62,27 @@
 
 ## 4. 数据模型
 
-两张主表 + 一张待办。
+两张主表 + 一张待办。**对话与记忆分开**：窗口渲染只读 `messages`，记忆只读 `events`。
 
 ```
-events    进来的东西   ← 用户输入的事件、Hermes 推来的外部消息
-messages  它说的话     ← 所有回应：记录反馈、问候、洞察提示、抚慰
-plans     待办 / 目标  ← 从 events 提炼（P0 可先并入 events，用 status 字段）
+messages  窗口里的全部消息 ← 我说的每一句（role=me，原样保留、永不改写）+ 它说的每一句
+events    合并后的事件     ← 同一天重复/补充被合并成一条；Hermes 推来的洞察也在这里（不合并）
+plans     待办 / 目标      ← 从对话里长出来，可勾选
 ```
 
 | 表 | 关键字段 |
 |---|---|
-| `events` | id, source(user/hermes), type(record/plan/finance/insight), content, entities(JSON), recorded_at |
-| `messages` | id, kind(reply/greeting/insight/nudge), content, ref_event_id, created_at, read_at |
+| `messages` | id, **role(me/secretary)**, kind(user/reply/greeting/insight/nudge), content, card(JSON), ref_event_id, created_at, read_at |
+| `events` | id, source(user/hermes), type(record/plan/finance/insight/feeling), content, entities(JSON), **tags(JSON)**, **occurred_on**, recorded_at, **last_at**, **merged_count**, dedup_key |
 | `plans` | id, title, status(open/done), due_date, ref_event_id |
+
+**同一天合并**：一条输入进来，先看当天已有的事件（作为候选进 Context），
+如果它是其中某一条的重复 / 更正 / 补充（同一天、同一件事），就**整体替换**那条事件
+（content / entities / tags 都给合并后的完整版本，last_at 往后推，merged_count +1）；
+否则新建一条事件。判定复用唯一那次对话 LLM 调用，命中判定后仍要校验 id 在候选里。
+
+**标签**：`events.tags` 由模型**每次重新生成**（自由命名，名词短语 2-6 字），
+不维护标签字典表、不从固定枚举里挑——参考清单只出现在 prompt 里，且明确允许造新词。
 
 **旧模型处置**：`finance_txns` → 降为 `events.type=finance`；`insights` → 并入 `events(source=hermes)` + `messages`；`digests` 表 → 删除，并入 `messages`。
 
@@ -84,7 +92,9 @@ plans     待办 / 目标  ← 从 events 提炼（P0 可先并入 events，用 
 
 ### 5.1 记录 + 规划（P0）
 - **输入**：一句话，不选类型。
-- **输出**：一句话回应 + 记录卡；含待办时附计划卡。
+- **输出**：一句话回应 + 记录卡（卡片上带 AI 生成的标签；并入已有事件时标出"第 N 次补充"）；
+  含待办时附计划卡。
+- **合并**：同一天同一件事的重复 / 补充合并成**一条**事件，不重复堆记录。
 - **回应的三档**：确认（"记下了"）→ 比较（"这周第三次"）→ 追问（"上次你说要跑，跑了吗"）。M2 只做前两档。
 - **指标**：连续记录天数。
 
@@ -124,7 +134,7 @@ plans     待办 / 目标  ← 从 events 提炼（P0 可先并入 events，用 
 
 | 阶段 | 内容 | 完成标志 |
 |---|---|---|
-| **M0 架构** | 定 `events` / `messages` / `plans` 表，建消息总线 | 一页纸落成代码，UI 无变化 |
+| **M0 架构** | 定 `messages` / `events` / `plans` 表，建消息总线 | 一页纸落成代码，UI 无变化 |
 | **M1 瘦身** | 摘掉假数据页面、趋势图、评分卡 | 界面上不存在假数据 |
 | **M2 记录有回应** | `POST /api/events` 返回一句话 + 记录卡 | 输入后收到回应，而不是 toast |
 | **M3 问候** | 定时任务 + 问候卡 | 每天两次自动出现 |
