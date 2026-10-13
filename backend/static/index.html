@@ -7,7 +7,9 @@
   <meta name="theme-color" content="#FBF7F1">
   <meta name="description" content="一个只有聊天窗口的个人秘书。">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🌿</text></svg>">
-  <link rel="stylesheet" href="/styles.css">
+  <!-- ?v= 用来把浏览器里可能还"新鲜"的旧缓存整条绕开：
+       每次改前端就把版本号 +1（服务端另有 no-cache 兜底，这是双保险） -->
+  <link rel="stylesheet" href="/styles.css?v=3">
 </head>
 <body>
   <div class="app">
@@ -71,6 +73,6 @@
     </div>
   </div>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=3"></script>
 </body>
 </html>

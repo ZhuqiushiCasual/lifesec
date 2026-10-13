@@ -1,6 +1,13 @@
 /* selfsec 前端 —— 一个窗口 + 一个回溯弹层。零依赖零构建。 */
 
 const $ = (s) => document.querySelector(s);
+// 绑事件前先确认元素存在：万一浏览器拿着"旧 HTML + 新脚本"（缓存错配），
+// 不至于在这一行整脚本挂掉、连消息流都渲染不出来。
+const on = (s, evt, fn) => {
+  const el = $(s);
+  if (el) el.addEventListener(evt, fn);
+  else console.warn('[selfsec] 页面缺少元素', s, '—— 前端脚本与 HTML 版本不一致，强制刷新一次');
+};
 const stream = $('#stream');
 
 let items = [];
@@ -478,24 +485,24 @@ $('#drawer-tabs').addEventListener('click', (e) => {
 });
 
 /* 画像初始化 */
-$('#profile-init').addEventListener('click', openOnboard);
-$('#ob-close').addEventListener('click', closeOnboard);
-$('#ob-next').addEventListener('click', obNext);
-$('#ob-back').addEventListener('click', () => {
+on('#profile-init', 'click', openOnboard);
+on('#ob-close', 'click', closeOnboard);
+on('#ob-next', 'click', obNext);
+on('#ob-back', 'click', () => {
   OB.step = 'form';
   obRender();
 });
-$('#onboard').addEventListener('click', (e) => {
+on('#onboard', 'click', (e) => {
   if (e.target.id === 'onboard') closeOnboard();
 });
-$('#ob-body').addEventListener('click', (e) => {
+on('#ob-body', 'click', (e) => {
   const chip = e.target.closest('.q-choice');
   if (!chip) return;
   const qid = chip.parentElement.dataset.q;
   OB.choice[qid] = OB.choice[qid] === chip.dataset.c ? '' : chip.dataset.c; // 再点一次取消
   obRender();
 });
-$('#ob-body').addEventListener('input', (e) => {
+on('#ob-body', 'input', (e) => {
   const ta = e.target.closest('textarea[data-t]');
   if (!ta) return;
   OB.answers[ta.dataset.t] = ta.value;
@@ -514,7 +521,8 @@ $('#ob-body').addEventListener('input', (e) => {
   // 画像还没建立时露出入口；建过之后这个按钮就消失了
   api('/api/onboarding/questions')
     .then((data) => {
-      $('#profile-init').hidden = !!data.answered;
+      const btn = $('#profile-init');
+      if (btn) btn.hidden = !!data.answered;
     })
-    .catch(() => {});
+    .catch((e) => console.warn('[selfsec] 取不到问卷状态，画像入口保持隐藏：', e.message));
 })();

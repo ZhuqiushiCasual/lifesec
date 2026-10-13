@@ -66,3 +66,19 @@ async def health():
 
 # 前端：唯一一个聊天窗口。挂载在最后，/api/* 与 /health 优先匹配
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+
+
+@app.middleware("http")
+async def static_revalidate(request, call_next):
+    """静态页与脚本一律要求浏览器回源校验（no-cache = 用之前先问一声，不是不缓存）。
+
+    StaticFiles 不返 Cache-Control，浏览器就按启发式规则自行决定缓存多久——
+    部署新前端后，用户手里会出现"新 HTML + 缓存里的旧 app.js"这种错配
+    （表现为：按钮在 HTML 里躺着，但没脚本把它放出来；服务端日志里甚至看不到
+    那个 .js 的请求）。带 ETag / Last-Modified 时回源是 304，代价可以忽略。
+    """
+    response = await call_next(request)
+    path = request.url.path
+    if path in ("/", "/index.html") or path.endswith((".js", ".css", ".html")):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
