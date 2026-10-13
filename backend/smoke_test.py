@@ -316,6 +316,13 @@ async def run() -> None:
             )).scalar_one()
         check("问卷答案单独存放（source=questionnaire）", n1 == 10, f"{n1} 条")
 
+        # 再 apply 一次（只答一题）：不该把之前答到的节清空 —— 问卷是补充/校正，不是覆盖
+        r = await c.post("/api/onboarding/apply", json={"answers": {"hobby": "换了台相机"}})
+        merged_sections = r.json()["sections"]
+        check("重复提交只更新答到的节，不清空其它节",
+              all(merged_sections.get(k) for k in ("identity", "style", "avoid", "current")),
+              str({k: bool(v) for k, v in merged_sections.items()}))
+
         print("\n[12] 问卷不污染时间线（它不算「我说过的话」）")
         stream = (await c.get("/api/messages?limit=200")).json()
         check("问卷标记没混进窗口流",

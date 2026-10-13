@@ -176,7 +176,10 @@ async def preview(db: AsyncSession, user: User, answers: dict) -> dict:
 
 
 async def apply(db: AsyncSession, user: User, answers: dict) -> dict:
-    """落库：问卷事件（source=questionnaire）+ 第一版画像（v1，不推 nudge）。"""
+    """落库：问卷事件（source=questionnaire）+ 第一版画像（v1，不推 nudge）。
+
+已有画像时是**合并**：只更新答到的节，其余（含 migrate_v3 搬进来的旧内容）不动。
+"""
     now = now_local()
     sections = draft_sections(answers)
 
@@ -199,9 +202,6 @@ async def apply(db: AsyncSession, user: User, answers: dict) -> dict:
             )
         )
 
-    filled = {k: v for k, v in sections.items() if v}
-    cap = mem_profile.enforce_limit({k: sections.get(k, "") for k in _ORDER})
-
     row = await mem_profile.get(db, user.id)
     if row is None:
         row = MemoryProfile(user_id=user.id, version=1)
@@ -211,10 +211,22 @@ async def apply(db: AsyncSession, user: User, answers: dict) -> dict:
         row.version += 1
         version = row.version
 
+    # **合并而不是覆盖**：问卷是"初始化 / 校正"，不是清空重来。
+    # 不填的那几节保持原样——否则已有画像（含 migrate_v3 从旧 content 搬进 insight 的那段）
+    # 会在用户点确认的瞬间静默丢掉。
+    prev_sections = mem_profile.sections_of(row)
+    prev_sources = dict(row.sources or {})
+    filled = {k: v for k, v in sections.items() if v}
+    merged = {k: (sections.get(k) or prev_sections.get(k) or "") for k in _ORDER}
+    cap = mem_profile.enforce_limit(merged)
+
+    sources = dict(prev_sources)
+    for k in filled:
+        sources[k] = {"event_ids": [], "updated_at": f"{now:%Y-%m-%d %H:%M:%S}", "note": "问卷初始化"}
+
     row.sections = cap
     row.content = mem_profile.render(cap)
-    row.sources = {k: {"event_ids": [], "updated_at": f"{now:%Y-%m-%d %H:%M:%S}", "note": "问卷初始化"}
-                   for k in filled}
+    row.sources = sources
     row.summary = "初始化问卷"
     row.event_count = await mem_profile.count_events(db, user.id)
     row.msg_count = await mem_profile.count_user_msgs(db, user.id)
