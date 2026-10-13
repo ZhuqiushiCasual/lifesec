@@ -36,5 +36,31 @@ class Settings:
     # 4.4 会话短期：注入 prompt 的最近轮数
     session_window: int = int(os.environ.get("SESSION_WINDOW", "6"))
 
+    # ── 画像（Portrait）────────────────────────────────────
+    # 硬上限：整段画像的字符数。画像越长越不被遵守，而且这份 token 每轮都要付。
+    portrait_char_limit: int = int(os.environ.get("PORTRAIT_CHAR_LIMIT", "1500"))
+    # 时钟一：每 N 条用户消息迭代一次画像
+    portrait_user_turns: int = int(os.environ.get("PORTRAIT_USER_TURNS", "20"))
+    # 时钟二：距上次迭代超过 N 小时 **且** 新增事件 ≥ M 条，才重算（防漂移：没有新增就不重写）
+    portrait_hours: int = int(os.environ.get("PORTRAIT_HOURS", "24"))
+    portrait_min_new_events: int = int(os.environ.get("PORTRAIT_MIN_NEW_EVENTS", "3"))
+
+    # ── 馆藏（Library / 索引卡）────────────────────────────
+    # 索引卡上限行数（常驻注入的那份目录，对应 Claude Code 的 200 行索引）
+    index_max_lines: int = int(os.environ.get("INDEX_MAX_LINES", "60"))
+    # 每个标签的档首摘要上限（字符）
+    digest_char_limit: int = int(os.environ.get("DIGEST_CHAR_LIMIT", "60"))
+    # 时钟三：每 N 条用户消息重算「有新增事件的那些标签」的档首摘要
+    tag_iter_turns: int = int(os.environ.get("TAG_ITER_TURNS", "10"))
+
+    # ── 拼接（Context 组装）────────────────────────────────
+    # Block C：近 N 轮「用户提问」（只取我说的，带时间锚与主题）
+    user_turn_window: int = int(os.environ.get("USER_TURN_WINDOW", "40"))
+    # 命中规则：每次最多加载几档、每档最多几条原文
+    hit_max_tags: int = int(os.environ.get("HIT_MAX_TAGS", "3"))
+    hit_max_events: int = int(os.environ.get("HIT_MAX_EVENTS", "3"))
+    # 软归一：注入 prompt 的「已有标签清单」条数（让模型优先复用已有标签）
+    existing_tags_in_prompt: int = int(os.environ.get("EXISTING_TAGS_IN_PROMPT", "60"))
+
 
 settings = Settings()

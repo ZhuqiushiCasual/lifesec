@@ -28,8 +28,9 @@ from app.database import Base, DateTimeMicro
 from app.utils import now_local
 
 # source 取值
-SOURCE_USER = "user"
-SOURCE_HERMES = "hermes"
+SOURCE_USER = "user"                  # 用户自己产生的事件（同一天合并后的结果）
+SOURCE_HERMES = "hermes"              # 外部系统推来的洞察（一条一事件，不参与合并）
+SOURCE_QUESTIONNAIRE = "questionnaire"  # 初始化问卷的答案（画像的种子，不是"他说过的话"）
 
 # type 取值
 TYPE_RECORD = "record"    # 生活记录

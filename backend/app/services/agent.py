@@ -1,12 +1,15 @@
 """对话接口的核心编排。
 
-    意图路由 → 组装 Context（含今天的事件候选）→ 生成回应 + 归档决定
+    意图路由 → 组装 Context（五个 Block）→ 生成回应 + 归档决定
              → 落窗口（我说的原话）→ 合并/新建事件 → 落待办 → 落回应
+             → 记忆迭代时钟（档迭代 / 画像迭代，幂等）
 
-设计取舍：**全程只有一次 LLM 调用**（services/ai/reply.py）。
-意图判定、字段抽取、标签生成、以及「并入今天哪条事件」都在这一次里完成——
-它们本来就是同一个理解的不同侧面，拆开只会更贵、更容易自相矛盾。
-route() 只做本地能确定的事（判断这条输入是不是在表达情绪），不做第二次调用。
+回应与归档由同一次生成完成：意图判定、字段抽取、标签生成、
+以及「并入今天哪条事件」本来就是同一个理解的不同侧面，拆开会让模型重复理解同一句话，
+也会出现"回应说合并了、归档却新建了一条"这种自相矛盾。
+route() 只做本地能确定的事（判断这条输入是不是在表达情绪），不额外调用模型。
+
+记忆侧的迭代（档摘要 / 画像）不在这条路径里，它由 lifecycle 的三个时钟驱动。
 """
 
 from __future__ import annotations
@@ -22,7 +25,8 @@ from app.models.user import User
 from app.services import records
 from app.services.ai import reply as ai_reply
 from app.services.memory import context as ctx_builder
-from app.services.memory import profile as mem_profile
+from app.services.memory import library as mem_library
+from app.services.memory import lifecycle
 
 log = logging.getLogger("selfsec.agent")
 
@@ -87,8 +91,11 @@ async def handle(db: AsyncSession, user: User, content: str) -> dict:
     # 1. 组装 Context（此时不含本条输入——统计的是"之前"，候选也不含它还没并入的东西）
     ctx = await ctx_builder.build(db, user, content, hint=hint)
 
-    # 2. 生成回应 + 归档决定（唯一一次 LLM 调用）
-    data = await ai_reply.generate(ctx.memory_block, ctx.history, content)
+    # 2. 生成回应 + 归档决定
+    #    已有标签清单一并给它 —— 标签的"软归一"：优先复用已有写法，
+    #    否则同义不同名会把同一档裂成两半（设计文档 4.5）
+    existing = await mem_library.existing_tags(db, user.id)
+    data = await ai_reply.generate(ctx.memory_block, ctx.history, content, existing_tags=existing)
 
     # 3. 落事件：合并进今天已有的那一条，或新建一条
     etype = data["type"] if data["type"] in VALID_TYPES else TYPE_RECORD
@@ -127,10 +134,11 @@ async def handle(db: AsyncSession, user: User, content: str) -> dict:
     await db.commit()
     await db.refresh(msg)
 
-    # 6. 阈值触发「总结意识」（未达阈值时内部直接返回）
+    # 6. 记忆迭代时钟（每 10 轮档迭代 / 每 20 轮画像迭代；每日兜底在调度器里）
+    #    幂等由 job_runs 保证；没到条件时内部直接返回
     try:
-        await mem_profile.refresh(db, user.id)
-    except Exception as e:  # noqa: BLE001 —— 画像刷新失败不影响本次回应
-        log.warning("画像阈值刷新失败: %s", e)
+        await lifecycle.tick(db, user.id)
+    except Exception as e:  # noqa: BLE001 —— 迭代失败不影响本次回应
+        log.warning("记忆迭代失败: %s", e)
 
     return {"reply": msg.content, "card": card, "message_id": msg.id, "event_id": event.id, "merged": merged}

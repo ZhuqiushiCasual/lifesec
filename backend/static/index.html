@@ -17,6 +17,7 @@
         <b>selfsec</b>
       </div>
       <div class="meta">
+        <button id="profile-init" class="badge" hidden>建立画像</button>
         <button id="open-history" class="badge">全部</button>
         <button id="plans-badge" class="badge" hidden></button>
         <span id="today" class="today"></span>
@@ -46,6 +47,27 @@
       </div>
       <div class="drawer-body" id="drawer-body"></div>
       <button id="drawer-more" class="drawer-more" hidden>加载更早</button>
+    </div>
+  </div>
+
+  <!-- 画像初始化：10 题 → 可审阅预览 → 确认。建过之后入口按钮就消失 -->
+  <div id="onboard" class="drawer" hidden>
+    <div class="drawer-panel">
+      <div class="drawer-head">
+        <div class="ob-head">
+          <b>先说清你是谁</b>
+          <span id="ob-sub">10 个问题，答完它就一直记得</span>
+        </div>
+        <button id="ob-close" class="drawer-close">关闭</button>
+      </div>
+      <div class="drawer-body" id="ob-body"></div>
+      <div class="ob-foot">
+        <span class="ob-progress" id="ob-progress"></span>
+        <div class="ob-actions">
+          <button id="ob-back" class="ob-ghost" hidden>返回修改</button>
+          <button id="ob-next" class="ob-primary" disabled>看看它理解的你</button>
+        </div>
+      </div>
     </div>
   </div>
 

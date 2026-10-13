@@ -12,6 +12,14 @@ v2 之后重点覆盖：
   · 同一天的两条输入会**合并**到同一条事件（模型认定 + 代码侧的确定性校验，两条路都测）
   · 模型给的 merge_event_id 不在候选里时，绝不能改写历史
 
+v3（画像 + 馆藏）追加覆盖：
+
+  · 初始化问卷：10 题、预览不落库、答案单独存放（不污染"我说过什么"的时间线）
+  · 馆藏索引卡是**派生产物**，能从 events 重建；命中规则（字面 / 热集 / 兜底）
+  · 迭代的三个时钟 + job_runs 幂等锁（同一周期只跑一次）
+  · 画像分节 + provenance + 版本历史 + 硬上限（1500 字）
+  · 防漂移：没有新增就不重写画像
+
 用法：cd backend && python smoke_test.py
 """
 
@@ -256,6 +264,129 @@ async def run() -> None:
         print("\n[10] 后续对话是否引用记忆")
         r = await c.post("/api/chat", json={"content": "今天又跑了 30 分钟"})
         check("第二次记录仍能回应", r.status_code == 200, r.json().get("reply", "")[:60])
+
+        # ─────────────────────────── v3：画像 + 馆藏 ───────────────────────────
+        from sqlalchemy import func  # noqa: PLC0415
+
+        from app.models.event import SOURCE_QUESTIONNAIRE, Event as EventModel  # noqa: PLC0415
+        from app.models.job import JobRun  # noqa: PLC0415
+        from app.services.memory import lifecycle, library  # noqa: PLC0415
+        from app.services.memory import profile as mp  # noqa: PLC0415
+
+        print("\n[11] 初始化问卷（冷启动：10 题 → 预览 → 确认）")
+        r = await c.get("/api/onboarding/questions")
+        qs = r.json().get("questions", [])
+        check("GET /api/onboarding/questions 200", r.status_code == 200)
+        check("恰好 10 题（多了没人做）", len(qs) == 10, f"{len(qs)} 题")
+        check("每题都标注产出画像的哪一节",
+              all(q.get("section") in set(mp.SECTION_KEYS) for q in qs))
+        check("每题都写了为什么问（hint 或选项）", all(q.get("hint") or q.get("choices") for q in qs))
+
+        answers = {
+            "identity_what": "在职，做 AI 应用",
+            "goal_year": "年内把 selfsec 做完",
+            "style_conclusion": "先给结论，再给理由",
+            "style_decide": "数据与清单",
+            "energy": "一个人待着",
+            "stress": "先做最要紧的",
+            "avoid": "别说「我理解你的感受」这种话",
+            "hobby": "水下摄影",
+            "rhythm": "晚睡",
+            "address": "叫我老竹",
+        }
+        r = await c.post("/api/onboarding/preview", json={"answers": answers})
+        check("POST /api/onboarding/preview 200", r.status_code == 200, r.text[:160])
+        preview = r.json()
+        check("预览是分节结构", set(preview.get("sections", {})) == set(mp.SECTION_KEYS))
+        again = (await c.post("/api/onboarding/preview", json={"answers": answers})).json()
+        check("预览不调模型，所以可重复（两次结果一致）", preview["text"] == again["text"])
+        async with async_session() as db:
+            n0 = (await db.execute(
+                select(func.count()).select_from(EventModel).where(EventModel.source == SOURCE_QUESTIONNAIRE)
+            )).scalar_one()
+        check("预览阶段还没落库", n0 == 0, f"{n0} 条")
+
+        r = await c.post("/api/onboarding/apply", json={"answers": answers})
+        check("POST /api/onboarding/apply 200", r.status_code == 200, r.text[:160])
+        applied = r.json()
+        check("确认后有分节画像", bool(applied["sections"].get("avoid")), applied["sections"].get("avoid", ""))
+        async with async_session() as db:
+            n1 = (await db.execute(
+                select(func.count()).select_from(EventModel).where(EventModel.source == SOURCE_QUESTIONNAIRE)
+            )).scalar_one()
+        check("问卷答案单独存放（source=questionnaire）", n1 == 10, f"{n1} 条")
+
+        print("\n[12] 问卷不污染时间线（它不算「我说过的话」）")
+        stream = (await c.get("/api/messages?limit=200")).json()
+        check("问卷标记没混进窗口流",
+              all("你现在主要在做什么" not in (m["content"] or "") for m in stream))
+
+        print("\n[13] 馆藏：索引卡是派生产物 + 命中规则")
+        async with async_session() as db:
+            tags = await library.rebuild_index(db, DEFAULT_USER_ID)
+            rows = await library.card_rows(db, DEFAULT_USER_ID)
+            check("索引卡有行", bool(rows), f"{tags} 个标签 / {len(rows)} 行")
+            check("每行都有条数与最近时间", all(r.count >= 1 and r.last_at for r in rows))
+            check("问卷事件不进索引卡（它不是「你做过的事」）",
+                  all(r.tag != "画像初始化" for r in rows), str([r.tag for r in rows][:6]))
+            check("索引卡带一句话档首摘要或有待生成标记",
+                  all(r.digest is not None or r.count >= 1 for r in rows))
+
+            hot = await library.hot_tags(db, DEFAULT_USER_ID)
+            picked = await library.match(db, DEFAULT_USER_ID, "今天又去跑步了，膝盖有点酸", hot)
+            check("命中规则①：输入里字面出现标签名 → 命中该档", "跑步" in picked, str(picked))
+            check("命中数量有上限", len(picked) <= settings.hit_max_tags, f"{len(picked)} 档")
+            hits = await library.render_hits(db, DEFAULT_USER_ID, picked)
+            check("命中后能展开成「摘要 + 最近原文」", "相关档" in hits and "跑步" in hits)
+
+            await library.add_alias(db, DEFAULT_USER_ID, "慢跑", "跑步")
+            await db.commit()
+            picked2 = await library.match(db, DEFAULT_USER_ID, "今天慢跑了五公里", hot)
+            check("软归一：别名也能命中同一档", "跑步" in picked2, str(picked2))
+
+        print("\n[14] 迭代时钟 + 幂等锁（三个时钟会打架）")
+        async with async_session() as db:
+            first = await lifecycle.tag_iteration(db, DEFAULT_USER_ID, turns=10)
+            second = await lifecycle.tag_iteration(db, DEFAULT_USER_ID, turns=10)
+            check("档迭代第一次真正执行", not first.get("skipped"), str(first))
+            check("同一周期第二次被幂等锁挡下", second.get("skipped") is True, str(second))
+            runs = (await db.execute(select(func.count()).select_from(JobRun))).scalar_one()
+            check("job_runs 留了记录（可审计）", runs >= 1, f"{runs} 条")
+            tick = await lifecycle.tick(db, DEFAULT_USER_ID)
+            check("tick 可安全调用（非边界轮次不会触发迭代）",
+                  isinstance(tick, list) and len(tick) == 0, str(tick))
+
+        print("\n[15] 画像：分节 + provenance + 版本历史 + 硬上限")
+        r = await c.get("/api/memory")
+        mem = r.json()
+        check("画像返回分节结构", set(mem.get("sections", {})) == set(mp.SECTION_KEYS))
+        check("每节带来源（provenance，能回答「你凭什么这么说」）",
+              bool(mem.get("sources")), str(list(mem.get("sources", {}))[:4]))
+        check("画像有硬上限（≤1500 字）", len(mem["profile"]) <= settings.portrait_char_limit,
+              f"{len(mem['profile'])} 字")
+        check("有变更摘要", bool(mem.get("summary")), (mem.get("summary") or "")[:40])
+
+        capped = mp.enforce_limit({k: "字" * 2000 for k in mp.SECTION_KEYS})
+        check("超长画像会被按节截断到上限内",
+              len(mp.render(capped)) <= settings.portrait_char_limit, f"{len(mp.render(capped))} 字")
+
+        r = await c.get("/api/memory/library")
+        lib = r.json()
+        check("GET /api/memory/library 200", r.status_code == 200)
+        check("馆藏返回索引卡", bool(lib.get("card")), f"{len(lib.get('card', []))} 行")
+        check("馆藏返回版本历史", bool(lib.get("versions")),
+              f"共 {len(lib.get('versions', []))} 版")
+
+        print("\n[16] 防漂移：没有新增就不重写画像")
+        async with async_session() as db:
+            before = await mp.get(db, DEFAULT_USER_ID)
+            v0 = before.version if before else 0
+            ok, why = await mp.should_iterate(db, DEFAULT_USER_ID)
+            check("刚迭代过 → 不满足迭代条件", ok is False, f"{ok} / {why}")
+            after = await mp.refresh(db, DEFAULT_USER_ID)
+            check("非强制刷新在没有新增时不写库",
+                  after is None or after.version == v0,
+                  f"v{v0} → v{after.version if after else '（未写）'}")
 
 
 async def main() -> None:

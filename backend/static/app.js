@@ -303,6 +303,137 @@ function autosize() {
   t.style.height = Math.min(t.scrollHeight, 150) + 'px';
 }
 
+/* ---------- 画像初始化：10 题 → 可审阅预览 → 确认 ---------- */
+const OB = { questions: [], answers: {}, choice: {}, step: 'form', sections: {} };
+
+function obFilled() {
+  const text = Object.keys(OB.answers).filter((k) => String(OB.answers[k] || '').trim()).length;
+  const picked = Object.keys(OB.choice).filter((k) => OB.choice[k]).length;
+  return text + picked;
+}
+
+function obFormHTML() {
+  return OB.questions
+    .map((q) => {
+      const hint = q.hint ? `<div class="q-hint">${esc(q.hint)}</div>` : '';
+      const choices = (q.choices || []).length
+        ? `<div class="q-choices" data-q="${esc(q.id)}">${q.choices
+            .map(
+              (c) =>
+                `<button type="button" class="q-choice${OB.choice[q.id] === c ? ' on' : ''}" data-c="${esc(c)}">${esc(c)}</button>`
+            )
+            .join('')}</div>`
+        : '';
+      const ta =
+        q.kind === 'text' || q.kind === 'choice_text'
+          ? `<textarea rows="2" data-t="${esc(q.id)}" placeholder="${
+              q.kind === 'choice_text' ? '补一句：行业 / 在做的事' : '写一句就行'
+            }">${esc(OB.answers[q.id] || '')}</textarea>`
+          : '';
+      return `<div class="q"><label>${esc(q.question)}</label>${hint}${choices}${ta}</div>`;
+    })
+    .join('');
+}
+
+function obPreviewHTML() {
+  const labels = { identity: '身份', style: '沟通与风格', avoid: '回避项', current: '当前进行中', insight: '结论级洞察' };
+  const cards = Object.keys(labels)
+    .filter((k) => String(OB.sections[k] || '').trim())
+    .map((k) => `<div class="ob-card"><b>${labels[k]}</b><p>${esc(OB.sections[k])}</p></div>`)
+    .join('');
+  return (cards || `<div class="ob-empty">还看不出什么 —— 回去多填两题？</div>`) +
+    `<div class="ob-note">这是它现在对你的理解，之后每次对话都会带上它（画像 ≤1500 字，只挑关于「你是谁」的结论）。确认后它会随时间自己更新，你也能在「全部」里看到它推给你的变化。</div>`;
+}
+
+function obRender() {
+  $('#ob-body').innerHTML = OB.step === 'form' ? obFormHTML() : obPreviewHTML();
+  const filled = obFilled();
+  if (OB.step === 'form') {
+    $('#ob-progress').textContent = `已填 ${filled} / ${OB.questions.length}`;
+    $('#ob-back').hidden = true;
+    $('#ob-next').hidden = false;
+    $('#ob-next').textContent = '看看它理解的你';
+    $('#ob-next').disabled = filled === 0;
+    $('#ob-sub').textContent = '10 个问题，答完它就一直记得';
+  } else {
+    $('#ob-progress').textContent = '确认之后，这一页就收起来了';
+    $('#ob-back').hidden = false;
+    $('#ob-next').hidden = false;
+    $('#ob-next').textContent = '确认，就这样';
+    $('#ob-next').disabled = false;
+    $('#ob-sub').textContent = '这是它现在对你的理解';
+  }
+}
+
+async function openOnboard() {
+  try {
+    const data = await api('/api/onboarding/questions');
+    OB.questions = data.questions || [];
+    OB.step = 'form';
+    OB.sections = {};
+    $('#onboard').hidden = false;
+    obRender();
+  } catch (e) {
+    toast('拿不到问卷：' + e.message);
+  }
+}
+
+function closeOnboard() {
+  $('#onboard').hidden = true;
+}
+
+// 选择题 + 填空合成一份答案：choice_text 是「选项，补充」
+function obComposeAnswers() {
+  const out = {};
+  for (const q of OB.questions) {
+    const choice = OB.choice[q.id] || '';
+    const text = String(OB.answers[q.id] || '').trim();
+    if (q.kind === 'choice_text') {
+      const merged = [choice, text].filter(Boolean).join('，');
+      if (merged) out[q.id] = merged;
+    } else if (q.kind === 'choice') {
+      if (choice) out[q.id] = choice;
+    } else if (text) {
+      out[q.id] = text;
+    }
+  }
+  return out;
+}
+
+async function obNext() {
+  const btn = $('#ob-next');
+  btn.disabled = true;
+
+  if (OB.step === 'form') {
+    try {
+      const res = await api('/api/onboarding/preview', {
+        method: 'POST',
+        body: JSON.stringify({ answers: obComposeAnswers() }),
+      });
+      OB.sections = res.sections || {};
+      OB.step = 'preview';
+      obRender();
+    } catch (e) {
+      toast('预览失败：' + e.message);
+      btn.disabled = false;
+    }
+    return;
+  }
+
+  try {
+    await api('/api/onboarding/apply', {
+      method: 'POST',
+      body: JSON.stringify({ answers: obComposeAnswers() }),
+    });
+    closeOnboard();
+    $('#profile-init').hidden = true; // 建过之后入口就消失
+    toast('画像已建立，它现在认识你了', 2600);
+  } catch (e) {
+    toast('保存失败：' + e.message);
+    btn.disabled = false;
+  }
+}
+
 /* ---------- 事件绑定 ---------- */
 $('#input').addEventListener('input', () => {
   autosize();
@@ -334,7 +465,9 @@ $('#drawer').addEventListener('click', (e) => {
   if (e.target.id === 'drawer') closeDrawer();   // 点遮罩关闭
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !$('#drawer').hidden) closeDrawer();
+  if (e.key !== 'Escape') return;
+  if (!$('#onboard').hidden) return closeOnboard();
+  if (!$('#drawer').hidden) closeDrawer();
 });
 $('#drawer-tabs').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-f]');
@@ -344,6 +477,33 @@ $('#drawer-tabs').addEventListener('click', (e) => {
   loadDrawer(true);
 });
 
+/* 画像初始化 */
+$('#profile-init').addEventListener('click', openOnboard);
+$('#ob-close').addEventListener('click', closeOnboard);
+$('#ob-next').addEventListener('click', obNext);
+$('#ob-back').addEventListener('click', () => {
+  OB.step = 'form';
+  obRender();
+});
+$('#onboard').addEventListener('click', (e) => {
+  if (e.target.id === 'onboard') closeOnboard();
+});
+$('#ob-body').addEventListener('click', (e) => {
+  const chip = e.target.closest('.q-choice');
+  if (!chip) return;
+  const qid = chip.parentElement.dataset.q;
+  OB.choice[qid] = OB.choice[qid] === chip.dataset.c ? '' : chip.dataset.c; // 再点一次取消
+  obRender();
+});
+$('#ob-body').addEventListener('input', (e) => {
+  const ta = e.target.closest('textarea[data-t]');
+  if (!ta) return;
+  OB.answers[ta.dataset.t] = ta.value;
+  if (OB.step !== 'form') return;
+  $('#ob-progress').textContent = `已填 ${obFilled()} / ${OB.questions.length}`;
+  $('#ob-next').disabled = obFilled() === 0;
+});
+
 /* ---------- 启动 ---------- */
 (function init() {
   const d = new Date();
@@ -351,4 +511,10 @@ $('#drawer-tabs').addEventListener('click', (e) => {
   loadAll().catch((e) => {
     stream.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
   });
+  // 画像还没建立时露出入口；建过之后这个按钮就消失了
+  api('/api/onboarding/questions')
+    .then((data) => {
+      $('#profile-init').hidden = !!data.answered;
+    })
+    .catch(() => {});
 })();

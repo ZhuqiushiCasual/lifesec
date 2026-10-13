@@ -4,7 +4,8 @@
 依赖更少、行为更可读（也方便将来把这部分逻辑搬去别处）。
 
     早 morning_hour  问候（议程三问）
-    晚 evening_hour  今日小结 + 强制重算画像
+    晚 evening_hour  今日小结 + 走一遍每日兜底
+    00:00            每日兜底（CLOCK 3）：距上次迭代 >PORTRAIT_HOURS 且有新增才补跑
 
 对应架构图：调度器 →（定时触发）→ 意图路由，问候走的是同一条对话管道
 （问候也落进同一个窗口表 messages，只是 role=secretary）。
@@ -22,7 +23,7 @@ from app.database import async_session
 from app.models.message import KIND_GREETING, ROLE_SECRETARY, Message
 from app.models.user import User
 from app.services.deps import DEFAULT_USER_ID, DEFAULT_USER_NAME
-from app.services.memory import profile as mem_profile
+from app.services.memory import lifecycle
 from app.services.memory import stats
 from app.utils import now_local
 
@@ -60,7 +61,9 @@ async def _morning(db) -> None:
 async def _evening(db) -> None:
     user = await _load_user(db)
     stat_data = await stats.collect(db, user.id)
-    await mem_profile.refresh(db, user.id, force=True)
+    # 不再强制重算：走每日兜底那套条件（>24h 且确有新增才写），
+    # 否则就是"没有新信息也在重写画像"——画像会缓慢漂移（设计文档 4.4 防漂移）
+    await lifecycle.daily(db, user.id)
 
     db.add(
         Message(
@@ -74,11 +77,20 @@ async def _evening(db) -> None:
     await db.commit()
 
 
+async def _midnight(db) -> None:
+    """00:00 兜底：距上次迭代超过 PORTRAIT_HOURS 且确有新增，就补跑一次。"""
+    user = await _load_user(db)
+    result = await lifecycle.daily(db, user.id)
+    log.info("每日兜底：%s", result)
+
+
 async def fire(kind: str) -> None:
-    """手动触发一次定时任务（"morning" / "evening"）。调度循环与测试都走这里。"""
+    """手动触发一次定时任务（"morning" / "evening" / "midnight"）。调度循环与测试都走这里。"""
     async with async_session() as db:
         if kind == "morning":
             await _morning(db)
+        elif kind == "midnight":
+            await _midnight(db)
         else:
             await _evening(db)
     log.info("已触发定时任务：%s", kind)
@@ -95,7 +107,11 @@ async def loop() -> None:
     while True:
         try:
             now = now_local()
-            for kind, hour in (("morning", settings.morning_hour), ("evening", settings.evening_hour)):
+            for kind, hour in (
+                ("morning", settings.morning_hour),
+                ("evening", settings.evening_hour),
+                ("midnight", 0),          # CLOCK 3：每日兜底
+            ):
                 key = f"{now:%Y-%m-%d}:{kind}"
                 if now.hour == hour and key not in _fired:
                     _fired.add(key)

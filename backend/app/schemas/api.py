@@ -84,3 +84,43 @@ class MemoryOut(BaseModel):
     version: int
     event_count: int
     updated_at: Optional[datetime] = None
+    # v3：画像分节 + 每节来源（provenance）+ 最近一次变更摘要
+    sections: dict[str, str] = Field(default_factory=dict)
+    sources: dict[str, Any] = Field(default_factory=dict)
+    summary: Optional[str] = None
+    msg_count: int = 0
+
+
+class TagCardOut(BaseModel):
+    """索引卡的一行（馆藏目录）。"""
+
+    tag: str
+    count: int
+    last_at: Optional[datetime] = None
+    digest: Optional[str] = None
+
+
+class MemoryLibraryOut(BaseModel):
+    card: list[TagCardOut] = Field(default_factory=list)
+    versions: list[dict] = Field(default_factory=list)
+
+
+class MergeTagsOut(BaseModel):
+    applied: list[dict] = Field(default_factory=list)
+
+
+# ── /api/onboarding（初始化问卷）──────────────────────────
+class OnboardingAnswers(BaseModel):
+    answers: dict[str, str] = Field(default_factory=dict)
+
+
+class OnboardingPreviewOut(BaseModel):
+    sections: dict[str, str]
+    text: str
+
+
+class OnboardingApplyOut(BaseModel):
+    ok: bool
+    version: int
+    profile: str
+    sections: dict[str, str]

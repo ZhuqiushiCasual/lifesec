@@ -24,7 +24,7 @@ if not _selfsec_logger.handlers:
     _selfsec_logger.propagate = False  # 避免重复输出
 
 import app.models  # noqa: F401 —— 注册全部模型，create_all 才能看到
-from app.api import chat, insights, memory, messages, plans
+from app.api import chat, insights, memory, messages, onboarding, plans
 from app.database import Base, engine
 from app.services import scheduler
 from app.services.deps import ensure_default_user, verify_token
@@ -55,6 +55,7 @@ api_router.include_router(messages.router)
 api_router.include_router(insights.router)
 api_router.include_router(plans.router)
 api_router.include_router(memory.router)
+api_router.include_router(onboarding.router)
 app.include_router(api_router)
 
 

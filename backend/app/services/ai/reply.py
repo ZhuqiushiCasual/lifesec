@@ -37,10 +37,12 @@ REPLY_SYSTEM = """你是这个用户的个人秘书，只服务他一个人。�
    type 用 record / plan / finance / feeling / chat 里最贴切的一个
    （纯心情用 feeling，纯闲聊用 chat）。
 10. tags 给 1-4 个：名词短语、2-6 个字、直接写词不加 #。
-    **每次都重新想，不要照抄下面这份参考，也允许造参考之外的词。**
-    参考（只是命名风格，不是可选清单）：
-      领域类  运动 跑步 饮食 睡眠 健康 工作 加班 学习 阅读 财务 社交 家庭 情绪 出行 兴趣 外部信息
-      性质类  目标 习惯 重复 进展 计划 吐槽 灵感 心事
+    领域类参考（只是命名风格，不是可选清单）：运动 跑步 饮食 睡眠 健康 工作 加班 学习 阅读 财务 社交 家庭 情绪 出行 兴趣 外部信息
+    性质类参考：目标 习惯 重复 进展 计划 吐槽 灵感 心事
+11. **软归一**：下面「已有标签」是这个人已经用过的标签清单。
+    这次的内容如果能被其中某个标签覆盖，**必须优先复用那个写法**，
+    不要为了"更准确"另造近义词（`水下摄影` 和 `潜水摄影` 会把同一档裂成两半）。
+    确实是清单里没有的新话题，才允许造新词。
 
 只输出 JSON，不要任何多余文字：
 {
@@ -72,8 +74,20 @@ def _clean_merge_id(raw: Any) -> str | None:
     return None if s.lower() in ("", "null", "none", "nan") else s
 
 
-async def generate(memory_block: str, history: list[dict], user_text: str) -> dict[str, Any]:
-    system = REPLY_SYSTEM + "\n\n## 记忆（关于这个用户，可能为空）\n" + (memory_block.strip() or "（暂无）")
+async def generate(
+    memory_block: str,
+    history: list[dict],
+    user_text: str,
+    existing_tags: list[str] | None = None,
+) -> dict[str, Any]:
+    system = REPLY_SYSTEM
+
+    # 软归一：把已有标签清单一起给它，要求优先复用（见设计文档 4.5）
+    # 这一块变化很慢（只有出现新话题才会变），所以放在记忆块之前，不打扰前缀缓存。
+    if existing_tags:
+        system += "\n\n## 已有标签（优先复用这些写法）\n" + "、".join(f"#{t}" for t in existing_tags)
+
+    system += "\n\n## 记忆（关于这个用户，可能为空）\n" + (memory_block.strip() or "（暂无）")
     messages = [*history, {"role": "user", "content": user_text}]
 
     try:
