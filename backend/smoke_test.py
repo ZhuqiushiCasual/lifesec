@@ -29,6 +29,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -394,6 +395,58 @@ async def run() -> None:
             check("非强制刷新在没有新增时不写库",
                   after is None or after.version == v0,
                   f"v{v0} → v{after.version if after else '（未写）'}")
+
+        print("\n[17] 窗口流的 limit 语义：取的是「最近 N 条」，不是「最早的 N 条」")
+        # 线上事故（2026-10-15）：攒够 limit 条之后，新记的输入与它的回应都写进了库，
+        # 但窗口永远只返回最早的 60 条 → 用户看到的是「我说了，它不再回应」。
+        # 这里直接把库造成「已经超过 limit 条」，再断言最新那几条必须出现在窗口里。
+        from datetime import timedelta  # noqa: PLC0415
+
+        from app.models.event import SOURCE_USER, Event  # noqa: PLC0415
+
+        base = now_local()
+        async with async_session() as db:
+            for i in range(70):
+                db.add(Message(user_id=DEFAULT_USER_ID, role=ROLE_ME, kind=KIND_USER,
+                               content=f"水位测试·第{i}条", created_at=base - timedelta(seconds=200 - i)))
+            # 同一时刻的两条，且比上面所有都新：用来验证翻转不会打乱并列项的先后
+            tie = base + timedelta(seconds=1)
+            db.add(Message(user_id=DEFAULT_USER_ID, role=ROLE_ME, kind=KIND_USER,
+                           content="水位测试·并列·我说的", created_at=tie))
+            db.add(Message(user_id=DEFAULT_USER_ID, role=ROLE_SECRETARY, kind="reply",
+                           content="水位测试·并列·它说的", created_at=tie))
+            await db.commit()
+
+        async with async_session() as db:
+            newest_ev = (await db.execute(
+                select(Event).where(Event.user_id == DEFAULT_USER_ID, Event.source == SOURCE_USER)
+                .order_by(Event.recorded_at.desc(), Event.id.desc()).limit(1)
+            )).scalar_one()
+
+        window = (await c.get("/api/messages?limit=60")).json()
+        check("窗口返回 limit 条", len(window) == 60, f"{len(window)} 条")
+        check("窗口是最新的 60 条（最后一条就是刚记的）",
+              window[-1]["content"] == "水位测试·并列·它说的", window[-1]["content"])
+        check("窗口仍按时间正序",
+              all(window[i]["created_at"] <= window[i + 1]["created_at"]
+                  for i in range(len(window) - 1)))
+        check("最早的那几条被挤出窗口（LIMIT 在新的一头）",
+              all(not m["content"].startswith("水位测试·第0条") for m in window))
+        tail = [m["role"] for m in window if m["content"].startswith("水位测试·并列")]
+        check("最近 60 条里的并列项：我说的排在它说的之前", tail == ["me", "secretary"], str(tail))
+
+        desc = (await c.get("/api/messages?limit=10&order=desc")).json()
+        check("回溯（倒序）也是最近 10 条，最新在最上",
+              len(desc) == 10 and desc[0]["content"] == "水位测试·并列·它说的", desc[0]["content"])
+        cursor = quote(desc[-1]["created_at"], safe="")
+        older = (await c.get(f"/api/messages?limit=10&order=desc&before={cursor}")).json()
+        check("翻页游标之前才有内容（游标那条不重复出现）",
+              bool(older) and all(m["created_at"] < desc[-1]["created_at"] for m in older))
+
+        events = (await c.get("/api/messages?filter=record&limit=3")).json()
+        check("事件线也是最近 3 条（最新事件在里面）",
+              bool(events) and events[-1]["id"] == newest_ev.id,
+              f"{len(events)} 条 / 最新 {events[-1]['content'][:20] if events else ''}")
 
 
 async def main() -> None:
