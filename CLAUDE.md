@@ -113,6 +113,10 @@ Hermes     生成 + 迭代时钟        当前 User Message     4.3 迭代三时
 | GET | `/api/onboarding/questions` | 初始化 10 题 |
 | POST | `/api/onboarding/preview` | 可审阅预览：答案 → 五节草稿（不调模型） |
 | POST | `/api/onboarding/apply` | 确认落盘：问卷事件（`source=questionnaire`）+ 第一版画像 |
+| GET | `/api/date/menu` | **约会挑餐厅**的前台菜单（**不需要 token**）：`ORDER BY sort, id`，隐藏项不返回 |
+| POST | `/api/date/choose` | 她挑完发的那句话：落一条 `messages(role=me)`，不调模型（**不需要 token**） |
+| — | `/api/date/admin/*`、`/api/date/items`、`/api/date/reorder` | 菜单增删改 + 上下移排序，需请求头 `X-Date-Password`（`DATE_ADMIN_PASSWORD`） |
+| GET | `/date` | 约会挑餐厅页面（给另一半看的短链接，静态 `static/date.html`） |
 | GET | `/health` | 健康检查（无鉴权） |
 | GET | `/` | 前端静态页 |
 
@@ -141,6 +145,8 @@ tag_index       馆藏索引卡，一行一个标签：tag / count / last_at / d
                 **派生产物**，可从 events 重建，丢了不心疼
 tag_aliases     标签别名 → 规范名（软归一）。只做映射，**不合并事件本身**
 job_runs        迭代幂等锁：(job, period_key) 唯一键，跑过就跳过
+date_menu       约会挑餐厅的菜单项：内容 + 口味三轴(清/辣/油) + sort/hidden
+                **与记忆层无关**，只服务 /date 那一个页面；后台可增删改排序
 ```
 
 一次 `/api/chat` 的落库顺序：`messages(role=me, 原话)` → `events(合并或新建)` → 可选 `plans` → `messages(role=secretary, 回应)`。

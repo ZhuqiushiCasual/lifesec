@@ -1,3 +1,4 @@
+from app.models.date_menu import DateMenuItem
 from app.models.event import Event
 from app.models.job import JobRun
 from app.models.library import TagAlias, TagIndex
@@ -16,4 +17,5 @@ __all__ = [
     "TagIndex",
     "TagAlias",
     "JobRun",
+    "DateMenuItem",
 ]

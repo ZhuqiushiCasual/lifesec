@@ -22,6 +22,11 @@ class Settings:
 
     # 非空时启用接口鉴权：请求需带 X-API-Token 头
     api_token: str = os.environ.get("API_TOKEN", "")
+
+    # ── 约会挑餐厅（/date）后台密码 ────────────────────────
+    # 只保护「增删改排序」这些管理端点；前台读菜单 + 提交选择不需要它。
+    # 空值 = 后台永久禁用（不会裸奔）。默认值请在生产 .env 里改掉。
+    date_admin_password: str = os.environ.get("DATE_ADMIN_PASSWORD", "520520")
     debug: bool = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
 
     # ── 内置调度（services/scheduler.py）─────────────────────

@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FFF9F5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>小小菜单 · 这次你挑</title>
+<!--
+  /date —— 约会挑餐厅（给另一半看的页面）
+
+  页面职责：
+    1. 前台：展示菜单（GET /api/date/menu，不需要 token）→ 挑一家 → 确认弹层里
+       可以改那句话 → POST /api/date/choose，落一条 messages(role=me)，
+       他打开 selfsec 窗口就能看到「我选择 XXX餐厅」。
+    2. 后台：右下角小齿轮（半透明，她基本看不见）长按 / 点击 → 输入密码
+       （DATE_ADMIN_PASSWORD，请求头 X-Date-Password）→ 增删改 + 上下移排序。
+
+  零依赖零构建，跟着 selfsec 的 static/ 一起被 StaticFiles 托管。
+-->
+<style>
+  :root{
+    --paper:#FFF9F5; --card:#FFFFFF;
+    --ink:#4A3B38; --ink2:#8B7772; --ink3:#B9A6A0;
+    --line:#F6E4DE; --line2:#FCF1EC;
+    --pink:#F7A8B8; --pink-d:#E4698A; --rose:#FFF1F4;
+    --mint:#8FCBA5; --amber:#F3C77B;
+    --shadow:0 2px 4px rgba(190,140,140,.06), 0 10px 26px rgba(190,140,140,.10);
+    --shadow-s:0 1px 2px rgba(190,140,140,.06), 0 4px 12px rgba(190,140,140,.07);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;padding:0;color:var(--ink);font-size:15px;line-height:1.68;
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",sans-serif;
+    background:
+      radial-gradient(560px 320px at 88% -6%, #FFE7EE 0%, rgba(255,231,238,0) 62%),
+      radial-gradient(520px 300px at 4% 4%, #FFF2DA 0%, rgba(255,242,218,0) 58%),
+      var(--paper);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:calc(96px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:540px;margin:0 auto;padding:0 16px}
+  @media(min-width:720px){ .wrap{max-width:640px} }
+
+  /* ── 顶栏 ── */
+  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 2px 6px}
+  .brand{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;letter-spacing:.02em;color:var(--ink2)}
+  .brand .hrt{
+    width:30px;height:30px;border-radius:11px;display:grid;place-items:center;font-size:15px;
+    background:linear-gradient(135deg,#FFD9E3,#FFF0DA);
+    box-shadow:0 3px 10px rgba(228,105,138,.18);border:1px solid #FFE3EC;
+  }
+  .gear{
+    border:0;background:transparent;color:var(--ink3);opacity:.28;font-size:16px;
+    padding:8px;cursor:pointer;line-height:1;
+  }
+  .gear:active{opacity:.6}
+
+  /* ── 抬头 ── */
+  .hero{padding:8px 2px 16px}
+  .hero h1{
+    margin:0 0 8px;font-size:27px;line-height:1.28;letter-spacing:-.5px;font-weight:800;
+  }
+  .hero h1 .wav{color:var(--pink-d)}
+  .hero p{margin:0;font-size:13.5px;color:var(--ink2)}
+  .hero .note{
+    margin-top:11px;display:inline-flex;align-items:center;gap:6px;
+    font-size:11.5px;color:var(--ink3);background:#fff;border:1px dashed var(--line);
+    border-radius:999px;padding:5px 11px;
+  }
+
+  /* ── 筛选 ── */
+  .filters{
+    position:sticky;top:0;z-index:6;display:flex;gap:8px;overflow-x:auto;
+    margin:0 -16px;padding:10px 16px 11px;scrollbar-width:none;
+    background:linear-gradient(180deg,rgba(255,249,245,.97),rgba(255,249,245,.84));
+    backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  }
+  .filters::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink2);
+    background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 14px;
+    cursor:pointer;box-shadow:var(--shadow-s);transition:.16s ease;white-space:nowrap;
+  }
+  .chip:active{transform:scale(.96)}
+  .chip.on{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--pink),var(--pink-d))}
+
+  /* ── 卡片 ── */
+  .list{display:flex;flex-direction:column;gap:15px;padding:16px 0 8px}
+  .card{
+    position:relative;background:var(--card);border:1px solid var(--line);border-radius:20px;
+    box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:.2s ease;
+    animation:rise .3s ease both;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .card:active{transform:scale(.994)}
+  .card.sel{border-color:var(--pink);box-shadow:0 0 0 3px rgba(247,168,184,.28),var(--shadow)}
+  .thumb{position:relative;aspect-ratio:16/10;background:#FBF1EC;overflow:hidden}
+  .thumb svg,.thumb img{width:100%;height:100%;display:block;object-fit:cover}
+  .pill{
+    position:absolute;font-size:11.5px;font-weight:700;border-radius:999px;padding:4px 10px;
+    backdrop-filter:blur(6px);
+  }
+  .pill.dist{left:10px;top:10px;color:#fff;background:rgba(74,59,56,.55)}
+  .pill.taste{right:10px;top:10px;background:rgba(255,255,255,.92);border:1px solid #fff}
+  .pill.taste.light{color:#4E8A5C}
+  .pill.taste.spicy{color:#C2544A}
+  .pill.taste.oil{color:#A67517}
+  .tick{
+    position:absolute;left:10px;bottom:10px;width:30px;height:30px;border-radius:50%;
+    display:grid;place-items:center;font-size:14px;color:#fff;
+    background:linear-gradient(135deg,var(--pink),var(--pink-d));
+    box-shadow:0 4px 12px rgba(228,105,138,.35);
+    opacity:0;transform:scale(.6);transition:.18s ease;
+  }
+  .card.sel .tick{opacity:1;transform:none}
+
+  .body{padding:13px 15px 15px}
+  .name{margin:0 0 3px;font-size:17.5px;font-weight:800;letter-spacing:-.2px;line-height:1.34}
+  .sub{margin:0 0 11px;font-size:12.5px;color:var(--ink2)}
+  .sub .sep{margin:0 6px;color:var(--ink3)}
+
+  .facts{display:flex;gap:7px;margin:0 0 12px}
+  .fact{flex:1;background:var(--line2);border-radius:11px;padding:7px 6px;text-align:center}
+  .fact b{display:block;font-size:14px;font-weight:800;line-height:1.35}
+  .fact span{display:block;font-size:10.5px;color:var(--ink3);margin-top:1px}
+
+  .taste{display:flex;flex-direction:column;gap:5px;margin:0 0 12px}
+  .trow{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink2)}
+  .trow i{width:20px;flex:0 0 20px;font-style:normal;font-weight:700;color:var(--ink3)}
+  .tbar{flex:1;height:5px;border-radius:99px;background:#F8EDE8;overflow:hidden}
+  .tbar b{display:block;height:100%;border-radius:99px}
+  .tbar b.l{background:linear-gradient(90deg,#B6DCAF,#6FA878)}
+  .tbar b.s{background:linear-gradient(90deg,#F0B2A2,#C2544A)}
+  .tbar b.o{background:linear-gradient(90deg,#F6D79E,#C78F2C)}
+  .trow em{width:24px;flex:0 0 24px;text-align:right;font-style:normal;color:var(--ink3);font-variant-numeric:tabular-nums}
+
+  .why{margin:0 0 11px;font-size:13.5px;color:var(--ink2);line-height:1.62}
+  .why b,.tip b,.go b{display:block;font-size:10.5px;letter-spacing:.12em;color:var(--ink3);font-weight:700;margin-bottom:3px}
+  .why p{margin:0}
+
+  .go{background:#FFFDFB;border:1px solid var(--line2);border-radius:12px;padding:10px 12px;margin:0 0 10px}
+  .go div{font-size:12.5px;color:var(--ink2);line-height:1.6}
+  .go div+div{margin-top:5px}
+  .go .far{color:var(--pink-d);font-weight:700}
+  .tip{font-size:12.5px;color:#8A6A3E;background:#FFF8E9;border:1px solid #F7E8C8;border-radius:12px;padding:9px 12px;line-height:1.6}
+  .tip b{color:#A67F33}
+
+  /* ── 底部选择条 ── */
+  .bar{
+    position:fixed;left:0;right:0;bottom:0;z-index:20;
+    padding:10px 16px calc(12px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,rgba(255,249,245,.9),rgba(255,249,245,.99));
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);
+  }
+  .bar .inner{max-width:540px;margin:0 auto;display:flex;align-items:center;gap:12px}
+  @media(min-width:720px){ .bar .inner{max-width:640px} }
+  .bar .pick{flex:1;min-width:0}
+  .bar .pick .k{font-size:10.5px;color:var(--ink3);letter-spacing:.1em;font-weight:700}
+  .bar .pick .v{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar .pick .v.empty{color:var(--ink3);font-weight:600}
+  .go-btn{
+    flex:0 0 auto;font:inherit;font-size:15px;font-weight:800;color:#fff;border:0;cursor:pointer;
+    border-radius:15px;padding:13px 22px;letter-spacing:.01em;
+    background:linear-gradient(135deg,#FBA6B8,#E4698A);
+    box-shadow:0 8px 20px rgba(228,105,138,.32);transition:.16s ease;
+  }
+  .go-btn:active{transform:scale(.97)}
+  .go-btn[disabled]{background:#EDE1DC;color:#B9A6A0;box-shadow:none;cursor:not-allowed}
+
+  /* ── 弹层通用 ── */
+  .sheet-mask{
+    position:fixed;inset:0;z-index:40;background:rgba(74,59,56,.34);
+    backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;
+    opacity:0;pointer-events:none;transition:opacity .2s ease;
+  }
+  .sheet-mask.show{opacity:1;pointer-events:auto}
+  .sheet{
+    width:100%;max-width:520px;background:var(--card);border-radius:24px 24px 0 0;
+    padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+    transform:translateY(14px);transition:transform .24s cubic-bezier(.2,.8,.3,1);
+    box-shadow:0 -10px 40px rgba(120,80,80,.16);
+  }
+  .sheet-mask.show .sheet{transform:none}
+  @media(min-width:620px){
+    .sheet-mask{align-items:center}
+    .sheet{border-radius:24px;margin:0 16px;max-width:520px}
+  }
+  .sheet h3{margin:0 0 6px;font-size:17px;font-weight:800;letter-spacing:-.2px}
+  .sheet .hint{margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6}
+  .sheet textarea{
+    width:100%;min-height:86px;resize:vertical;font:inherit;font-size:14.5px;color:var(--ink);
+    background:#FFFDFC;border:1.5px solid var(--line);border-radius:14px;padding:11px 13px;
+    line-height:1.6;outline:none;
+  }
+  .sheet textarea:focus{border-color:var(--pink)}
+  .sheet .rows{display:flex;gap:10px;margin-top:14px}
+  .btn{
+    flex:1;font:inherit;font-size:14.5px;font-weight:700;border-radius:14px;padding:12px 10px;
+    cursor:pointer;border:1.5px solid var(--line);background:#fff;color:var(--ink2);transition:.16s ease;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn.primary{
+    color:#fff;border-color:transparent;background:linear-gradient(135deg,#FBA6B8,#E4698A);
+    box-shadow:0 8px 18px rgba(228,105,138,.28);
+  }
+  .btn.ghost{background:#FFFDFC}
+  .btn.danger{color:#C2544A;border-color:#F6D8D2}
+  .btn[disabled]{opacity:.55;cursor:not-allowed;transform:none}
+
+  /* ── 成功页 ── */
+  .done{
+    position:fixed;inset:0;z-index:50;background:var(--paper);
+    display:none;flex-direction:column;align-items:center;justify-content:center;
+    padding:28px 22px calc(28px + env(safe-area-inset-bottom));text-align:center;
+  }
+  .done.show{display:flex}
+  .done .env{font-size:52px;line-height:1;margin-bottom:14px;animation:pop .4s ease both}
+  @keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+  .done h2{margin:0 0 8px;font-size:23px;font-weight:800;letter-spacing:-.3px}
+  .done p{margin:0 0 18px;font-size:13.5px;color:var(--ink2);line-height:1.7}
+  .done .bubble{
+    max-width:330px;background:#fff;border:1px solid var(--line);border-radius:16px 16px 16px 6px;
+    padding:12px 15px;font-size:14px;box-shadow:var(--shadow-s);color:var(--ink);
+    text-align:left;word-break:break-word;
+  }
+  .done .bubble .who{font-size:10.5px;color:var(--ink3);letter-spacing:.1em;font-weight:700;margin-bottom:4px}
+  .done .acts{display:flex;gap:10px;margin-top:22px;width:100%;max-width:330px}
+
+  /* ── 后台 ── */
+  .admin{
+    position:fixed;inset:0;z-index:60;background:var(--paper);display:none;
+    flex-direction:column;overflow:hidden;
+  }
+  .admin.show{display:flex}
+  .admin-top{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;border-bottom:1px solid var(--line);background:#fff;
+  }
+  .admin-top h2{margin:0;font-size:16px;font-weight:800}
+  .admin-top .acts{display:flex;gap:8px;align-items:center}
+  .mini{
+    font:inherit;font-size:12.5px;font-weight:700;border-radius:10px;padding:7px 11px;cursor:pointer;
+    border:1px solid var(--line);background:#fff;color:var(--ink2);
+  }
+  .mini.pri{background:linear-gradient(135deg,#FBA6B8,#E4698A);color:#fff;border-color:transparent}
+  .admin-body{flex:1 1 auto;overflow-y:auto;padding:12px 14px calc(24px + env(safe-area-inset-bottom))}
+  .arow{
+    display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);
+    border-radius:14px;padding:10px 11px;margin-bottom:9px;
+  }
+  .arow .idx{width:22px;flex:0 0 22px;font-size:11px;color:var(--ink3);font-weight:700;text-align:center}
+  .arow .info{flex:1;min-width:0}
+  .arow .info .n{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .arow .info .m{font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .arow .ops{display:flex;gap:5px;flex:0 0 auto}
+  .icon-btn{
+    width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:#fff;
+    color:var(--ink2);font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;
+  }
+  .icon-btn:active{background:#FFF3F5}
+  .icon-btn.del{color:#C2544A;border-color:#F6D8D2}
+  .form-item{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+  .form-item label{display:block;font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.06em;margin-bottom:4px}
+  .form-item input[type=text],.form-item input[type=number],.form-item textarea,.form-item select{
+    width:100%;font:inherit;font-size:13.5px;color:var(--ink);background:#FFFDFC;
+    border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;outline:none;
+  }
+  .form-item textarea{min-height:64px;resize:vertical;line-height:1.55}
+  .form-item input:focus,.form-item textarea:focus,.form-item select:focus{border-color:var(--pink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .range-row{display:flex;align-items:center;gap:10px}
+  .range-row input[type=range]{flex:1;accent-color:var(--pink-d)}
+  .range-row b{width:20px;font-size:12px;color:var(--ink2);text-align:right}
+  .toast{
+    position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translate(-50%,10px);
+    background:rgba(74,59,56,.93);color:#fff;font-size:13px;padding:9px 16px;border-radius:999px;
+    opacity:0;pointer-events:none;transition:.22s ease;z-index:80;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .empty{padding:44px 14px;text-align:center;color:var(--ink3);font-size:13px}
+  .foot{margin:14px 2px 0;font-size:11px;color:var(--ink3);line-height:1.7}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><span class="hrt">♡</span><span id="brandTxt">小小菜单</span></div>
+    <button class="gear" id="gear" aria-label="管理">⚙</button>
+  </div>
+
+  <header class="hero">
+    <h1 id="hello">这次你挑<span class="wav">，</span>我安排 🌷</h1>
+    <p>挑一家你想吃的，剩下的交给我 —— 订位、路线、接你。</p>
+    <div class="note" id="countNote">正在把小店端上来…</div>
+  </header>
+
+  <nav class="filters" id="filters"></nav>
+  <main class="list" id="list"></main>
+  <div class="foot" id="foot"></div>
+</div>
+
+<div class="bar">
+  <div class="inner">
+    <div class="pick">
+      <div class="k">你的选择</div>
+      <div class="v empty" id="pickTxt">还没选好，慢慢看</div>
+    </div>
+    <button class="go-btn" id="goBtn" disabled>就这家啦 →</button>
+  </div>
+</div>
+
+<!-- 确认弹层 -->
+<div class="sheet-mask" id="confirmMask">
+  <div class="sheet">
+    <h3>发之前，先看一眼 ♡</h3>
+    <p class="hint">这句话会直接进到他的 selfsec 里。想怎么说都行，直接改就好。</p>
+    <textarea id="confirmText" rows="3"></textarea>
+    <div class="rows">
+      <button class="btn ghost" id="confirmCancel">再想想</button>
+      <button class="btn primary" id="confirmSend">发给他 ♡</button>
+    </div>
+  </div>
+</div>
+
+<!-- 成功页 -->
+<div class="done" id="done">
+  <div class="env">💌</div>
+  <h2>发出去啦</h2>
+  <p>他打开 selfsec 就能看到这句话。<br>剩下的事，让他表现。</p>
+  <div class="bubble"><div class="who">我</div><div id="doneText"></div></div>
+  <div class="acts">
+    <button class="btn ghost" id="doneBack">再挑一家</button>
+    <button class="btn primary" id="doneClose">好啦</button>
+  </div>
+</div>
+
+<!-- 后台密码 -->
+<div class="sheet-mask" id="gateMask">
+  <div class="sheet">
+    <h3>后台</h3>
+    <p class="hint">输入密码才能改菜单。</p>
+    <textarea id="pwInput" rows="1" placeholder="密码" style="min-height:0;height:46px"></textarea>
+    <div class="rows">
+      <button class="btn ghost" id="gateCancel">算了</button>
+      <button class="btn primary" id="gateGo">进去</button>
+    </div>
+  </div>
+</div>
+
+<!-- 后台面板 -->
+<div class="admin" id="admin">
+  <div class="admin-top">
+    <h2>菜单管理</h2>
+    <div class="acts">
+      <button class="mini pri" id="addBtn">＋ 新增</button>
+      <button class="mini" id="adminClose">退出</button>
+    </div>
+  </div>
+  <div class="admin-body">
+    <div id="adminList"></div>
+    <div id="adminForm" style="display:none"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================ 基础工具 ============================ */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let toastTimer;
+function toast(msg, ms = 1900){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+const API = '/api/date';
+
+/* ============================ 状态 ============================ */
+let items = [];          // 前台菜单
+let picked = null;       // 选中的 id
+let filter = 'all';
+let adminPw = sessionStorage.getItem('date_admin_pw') || '';
+let adminItems = [];
+let editing = null;      // 正在编辑的 item（null = 新增）
+
+const FILTERS = [
+  { key:'all',   label:'都行',     test: () => true },
+  { key:'light', label:'清淡的',   test: r => r.taste_light >= 4, sort:(a,b)=> b.taste_light - a.taste_light },
+  { key:'spicy', label:'想吃辣',   test: r => r.taste_spicy >= 3, sort:(a,b)=> b.taste_spicy - a.taste_spicy },
+  { key:'near',  label:'近一点',   test: r => r.dist_km <= 5 },
+  { key:'cheap', label:'人均百元', test: r => r.price <= 110 }
+];
+
+/* ============================ 插图（纯内联，无外链） ============================ */
+function art(kind, a, b){
+  const gid = 'g' + kind + Math.random().toString(36).slice(2, 7);
+  const steam = `
+    <path d="M150 96c8-10-8-18 0-28" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M182 90c8-11-8-19 0-30" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M214 96c8-10-8-18 0-28" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="3.5" stroke-linecap="round"/>`;
+  const pot = `
+    <ellipse cx="200" cy="176" rx="104" ry="16" fill="#000" opacity=".05"/>
+    <path d="M104 132h192a96 96 0 0 1-96 54 96 96 0 0 1-96-54z" fill="#fff" fill-opacity=".92"/>
+    <ellipse cx="200" cy="132" rx="96" ry="24" fill="#F7EFE4"/>
+    <ellipse cx="200" cy="131" rx="84" ry="18" fill="#FBF7F1"/>`;
+
+  const scenes = {
+    porridge: `${pot}${steam}
+      <ellipse cx="168" cy="130" rx="22" ry="8" fill="#F6CFB4" transform="rotate(-8 168 130)"/>
+      <ellipse cx="214" cy="134" rx="24" ry="8" fill="#F8DAC4" transform="rotate(6 214 134)"/>
+      <ellipse cx="196" cy="124" rx="18" ry="7" fill="#FADFCB" transform="rotate(-4 196 124)"/>
+      <circle cx="238" cy="128" r="4" fill="#9CC58F"/><circle cx="152" cy="126" r="3.4" fill="#9CC58F"/>
+      <ellipse cx="200" cy="197" rx="60" ry="7" fill="#E9DCCB" opacity=".55"/>`,
+    beefpot: `${pot}${steam}
+      <path d="M150 128c14-10 30-10 42 0-12 10-28 10-42 0z" fill="#E08C7A"/>
+      <path d="M200 134c14-10 30-10 42 0-12 10-28 10-42 0z" fill="#D97D6B"/>
+      <path d="M176 122c12-8 26-8 36 0-10 9-24 9-36 0z" fill="#EBA595"/>
+      <circle cx="246" cy="124" r="3.6" fill="#9CC58F"/><circle cx="160" cy="136" r="3.2" fill="#9CC58F"/>`,
+    sushi: `
+      <rect x="0" y="168" width="400" height="10" fill="#fff" fill-opacity=".55"/>
+      <rect x="0" y="178" width="400" height="6" fill="#fff" fill-opacity=".35"/>
+      <g><rect x="104" y="126" width="52" height="34" rx="9" fill="#FBF7F1"/>
+         <rect x="104" y="120" width="52" height="16" rx="8" fill="#F09A6E"/>
+         <rect x="122" y="116" width="10" height="44" rx="4" fill="#4A4038" opacity=".75"/></g>
+      <g><rect x="172" y="132" width="52" height="30" rx="9" fill="#FBF7F1"/>
+         <rect x="172" y="126" width="52" height="15" rx="8" fill="#E8875C"/>
+         <rect x="190" y="122" width="10" height="40" rx="4" fill="#4A4038" opacity=".75"/></g>
+      <g><rect x="240" y="126" width="52" height="34" rx="9" fill="#FBF7F1"/>
+         <rect x="240" y="120" width="52" height="16" rx="8" fill="#F6B98E"/>
+         <circle cx="266" cy="112" r="6" fill="#9CC58F" opacity=".9"/></g>
+      <circle cx="330" cy="120" r="12" fill="#DCE8DA"/><circle cx="330" cy="120" r="6" fill="#B7D2B3"/>`,
+    thai: `
+      <ellipse cx="200" cy="182" rx="96" ry="14" fill="#000" opacity=".05"/>
+      <path d="M112 130h176a88 88 0 0 1-88 52 88 88 0 0 1-88-52z" fill="#fff" fill-opacity=".92"/>
+      <ellipse cx="200" cy="130" rx="88" ry="22" fill="#F6E7C9"/>
+      <ellipse cx="200" cy="129" rx="76" ry="16" fill="#F2D79E"/>${steam}
+      <circle cx="172" cy="128" r="7" fill="#E08C6E"/><circle cx="206" cy="132" r="6" fill="#DC7F5F"/>
+      <circle cx="234" cy="126" r="5" fill="#E08C6E"/>
+      <path d="M138 122c10-6 20-6 30 0" stroke="#9CC58F" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M250 120c12-8 22-4 26 4" stroke="#7FA870" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
+    grill: `
+      <rect x="70" y="118" width="260" height="72" rx="12" fill="#fff" fill-opacity=".9"/>
+      <g stroke="#E7D6C2" stroke-width="2"><path d="M78 138h244"/><path d="M78 156h244"/><path d="M78 174h244"/></g>
+      <path d="M116 168c-8-14 2-22 0-32 10 8 14 18 8 32z" fill="#E8845A" opacity=".9"/>
+      <path d="M136 168c-7-12 1-19 0-28 9 7 12 16 7 28z" fill="#F2B872" opacity=".95"/>
+      <rect x="168" y="132" width="46" height="20" rx="7" fill="#D97D6B" transform="rotate(-6 191 142)"/>
+      <rect x="224" y="146" width="46" height="20" rx="7" fill="#C96A57" transform="rotate(5 247 156)"/>
+      <circle cx="292" cy="140" r="4" fill="#C25B4B" opacity=".8"/>
+      <circle cx="304" cy="154" r="3" fill="#C25B4B" opacity=".6"/>`,
+    western: `
+      <ellipse cx="200" cy="186" rx="118" ry="18" fill="#000" opacity=".05"/>
+      <circle cx="200" cy="140" r="76" fill="#fff" fill-opacity=".95"/>
+      <circle cx="200" cy="140" r="62" fill="none" stroke="#EFE3D6" stroke-width="2"/>
+      <path d="M164 148c6-22 26-32 44-28 20 4 30 22 24 38-4 10-18 12-32 10-16-2-38-8-36-20z" fill="#B4705C"/>
+      <path d="M176 142c8-14 26-20 40-16" stroke="#D9A08B" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <circle cx="246" cy="160" r="9" fill="#9CC58F"/><circle cx="234" cy="170" r="6" fill="#B7D2B3"/>
+      <circle cx="158" cy="132" r="4" fill="#F3C77B"/>
+      <path d="M300 96c6 10 2 16-2 20" stroke="#C9A0A8" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    chinese: `
+      <ellipse cx="200" cy="188" rx="108" ry="16" fill="#000" opacity=".05"/>
+      <circle cx="200" cy="140" r="72" fill="#fff" fill-opacity=".95"/>
+      <circle cx="200" cy="140" r="58" fill="none" stroke="#EADFD0" stroke-width="2"/>
+      <path d="M168 148c10-16 34-24 54-16 12 5 14 16 6 22-12 9-40 8-54 0-6-3-8-4-6-6z" fill="#C98B6B"/>
+      <path d="M180 132c10-6 22-6 32-2" stroke="#E6BCA6" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <circle cx="240" cy="128" r="7" fill="#9CC58F"/>
+      <path d="M150 120c8-10 8-16 4-22" stroke="#fff" stroke-opacity=".9" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M256 118c8-10 8-16 4-22" stroke="#fff" stroke-opacity=".7" stroke-width="3" fill="none" stroke-linecap="round"/>`
+  };
+  const inner = scenes[kind] || scenes.porridge;
+  return `<svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice" role="img" aria-label="菜品插画">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${esc(a || '#FDF1E7')}"/><stop offset="1" stop-color="${esc(b || '#F8E2D2')}"/>
+    </linearGradient></defs>
+    <rect width="400" height="250" fill="url(#${gid})"/>
+    <circle cx="330" cy="46" r="54" fill="#fff" opacity=".4"/>
+    <circle cx="58" cy="206" r="42" fill="#fff" opacity=".28"/>
+    ${inner}
+  </svg>`;
+}
+
+/* ============================ 渲染：前台 ============================ */
+function bars(r){
+  const rows = [['清','l',r.taste_light], ['辣','s',r.taste_spicy], ['油','o',r.taste_oil]];
+  return rows.map(([lab, cls, v]) => `<div class="trow"><i>${lab}</i><span class="tbar"><b class="${cls}" style="width:${Math.max(0, Math.min(5, v)) * 20}%"></b></span><em>${v}/5</em></div>`).join('');
+}
+
+function cardHTML(r, i){
+  const img = r.photo ? `<img src="${esc(r.photo)}" alt="${esc(r.name)}" loading="lazy">` : art(r.art, r.accent_a, r.accent_b);
+  const score = r.score > 0 ? r.score.toFixed(1) : '—';
+  return `<article class="card ${picked === r.id ? 'sel' : ''}" data-id="${esc(r.id)}" style="animation-delay:${Math.min(i,6) * 45}ms">
+    <div class="thumb">
+      ${img}
+      <span class="pill dist">${r.dist_km.toFixed(1)} km</span>
+      <span class="pill taste ${esc(r.taste_kind)}">${esc(r.taste_label)}</span>
+      <span class="tick">✓</span>
+    </div>
+    <div class="body">
+      <h2 class="name">${esc(r.name)}</h2>
+      <p class="sub">${esc(r.cuisine)}<span class="sep">·</span>${esc(r.branch)}</p>
+      <div class="facts">
+        <div class="fact"><b>¥${r.price}</b><span>人均</span></div>
+        <div class="fact"><b>${score}</b><span>评分</span></div>
+        <div class="fact"><b>${r.dist_km.toFixed(1)}<span style="font-size:9.5px">km</span></b><span>离你公司</span></div>
+      </div>
+      <div class="taste">${bars(r)}</div>
+      <div class="why"><b>为什么带你吃这家</b><p>${esc(r.reason)}</p></div>
+      <div class="go">
+        <b>怎么去</b>
+        <div>${esc(r.metro)}</div>
+        <div class="far">${esc(r.reach)}</div>
+      </div>
+      <div class="tip"><b>点菜小抄</b>${esc(r.tip)}</div>
+    </div>
+  </article>`;
+}
+
+function renderFilters(){
+  $('#filters').innerHTML = FILTERS.map(f => {
+    const n = items.filter(f.test).length;
+    return `<button class="chip ${f.key === filter ? 'on' : ''}" data-f="${f.key}">${f.label}${n ? '' : ' ·0'}</button>`;
+  }).join('');
+  $('#filters').querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
+    filter = b.dataset.f; renderFilters(); renderList();
+  }));
+}
+
+function renderList(){
+  const f = FILTERS.find(x => x.key === filter) || FILTERS[0];
+  const rows = items.filter(f.test).slice().sort(f.sort || ((a, b) => a.dist_km - b.dist_km));
+  $('#list').innerHTML = rows.length
+    ? rows.map(cardHTML).join('')
+    : '<div class="empty">这个条件下暂时没有店 —— 换个筛选试试。</div>';
+  $('#list').querySelectorAll('.card').forEach(el => el.addEventListener('click', () => pick(el.dataset.id)));
+}
+
+function pick(id){
+  picked = (picked === id) ? null : id;
+  const item = items.find(x => x.id === picked);
+  $('#list').querySelectorAll('.card').forEach(el => el.classList.toggle('sel', el.dataset.id === picked));
+  const t = $('#pickTxt');
+  if (item){ t.textContent = item.name; t.classList.remove('empty'); $('#goBtn').disabled = false; }
+  else { t.textContent = '还没选好，慢慢看'; t.classList.add('empty'); $('#goBtn').disabled = true; }
+  if (item) haptic();
+}
+function haptic(){ if (navigator.vibrate) navigator.vibrate(8); }
+
+/* ============================ 前台：拉数据 ============================ */
+async function loadMenu(){
+  try{
+    const res = await fetch(`${API}/menu`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    items = await res.json();
+  } catch(e){
+    $('#countNote').textContent = '菜单没加载出来，刷新一下试试';
+    console.error(e); return;
+  }
+  $('#countNote').textContent = items.length
+    ? `共 ${items.length} 家 · 都是我们一起吃过的店`
+    : '菜单还是空的，让他去后台加两家';
+  $('#foot').innerHTML = '口味分「清 / 辣 / 油」三档，0–5 是我们自己的体感。距离是他公司过去的直线距离。';
+  renderFilters(); renderList();
+
+  const to = new URLSearchParams(location.search).get('to');
+  if (to) $('#hello').innerHTML = `${esc(to)}，这次你挑<span class="wav">，</span>我安排 🌷`;
+}
+
+/* ============================ 确认 + 发送 ============================ */
+function openConfirm(){
+  const item = items.find(x => x.id === picked);
+  if (!item) return;
+  $('#confirmText').value = `我选择${item.name}`;
+  $('#confirmMask').classList.add('show');
+  setTimeout(() => $('#confirmText').focus(), 260);
+}
+
+async function sendChoice(){
+  const text = $('#confirmText').value.trim();
+  if (!text){ toast('写一句再发给她吧'); return; }
+  const btn = $('#confirmSend');
+  btn.disabled = true; btn.textContent = '发送中…';
+  try{
+    const res = await fetch(`${API}/choose`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, restaurant_id: picked })
+    });
+    if (!res.ok){
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.detail || ('HTTP ' + res.status));
+    }
+    const data = await res.json();
+    $('#confirmMask').classList.remove('show');
+    $('#doneText').textContent = data.text;
+    $('#done').classList.add('show');
+  } catch(e){
+    toast('没发出去：' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '发给他 ♡';
+  }
+}
+
+/* ============================ 后台 ============================ */
+async function adminFetch(path, opts = {}){
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', 'X-Date-Password': adminPw, ...(opts.headers || {}) }
+  });
+  if (res.status === 401){ throw new Error('密码不对'); }
+  if (!res.ok){
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.detail || ('HTTP ' + res.status));
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function openAdmin(){
+  if (!adminPw){ $('#gateMask').classList.add('show'); setTimeout(() => $('#pwInput').focus(), 250); return; }
+  try{ await adminFetch('/admin/check', { method: 'POST' }); }
+  catch(e){ adminPw = ''; sessionStorage.removeItem('date_admin_pw'); $('#gateMask').classList.add('show'); return; }
+  $('#admin').classList.add('show'); await loadAdmin();
+}
+
+async function loadAdmin(){
+  try{
+    adminItems = await adminFetch('/admin/items');
+    document.getElementById('adminForm').style.display = 'none';
+    renderAdminList();
+  } catch(e){ toast(e.message); }
+}
+
+function renderAdminList(){
+  const box = $('#adminList');
+  box.innerHTML = adminItems.map((r, i) => `
+    <div class="arow" data-id="${esc(r.id)}">
+      <div class="idx">${i + 1}</div>
+      <div class="info">
+        <div class="n">${esc(r.name)}${r.hidden ? ' <span style="color:#B9A6A0;font-weight:600">（隐藏）</span>' : ''}</div>
+        <div class="m">${esc(r.cuisine)} · ¥${r.price} · ${r.dist_km.toFixed(1)}km</div>
+      </div>
+      <div class="ops">
+        <button class="icon-btn" data-act="up" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="icon-btn" data-act="down" ${i === adminItems.length - 1 ? 'disabled' : ''}>↓</button>
+        <button class="icon-btn" data-act="edit">✎</button>
+        <button class="icon-btn del" data-act="del">✕</button>
+      </div>
+    </div>`).join('') || '<div class="empty">还没有条目，点右上角「＋ 新增」。</div>';
+
+  box.querySelectorAll('.arow').forEach(row => {
+    const id = row.dataset.id;
+    row.querySelectorAll('.icon-btn').forEach(btn => btn.addEventListener('click', async () => {
+      const act = btn.dataset.act;
+      if (act === 'edit'){ editing = adminItems.find(x => x.id === id); renderForm(editing); return; }
+      if (act === 'del'){
+        if (!confirm('删掉「' + (adminItems.find(x => x.id === id) || {}).name + '」？')) return;
+        try{ await adminFetch('/items/' + id, { method: 'DELETE' }); await loadAdmin(); await loadMenu(); toast('删掉了'); }
+        catch(e){ toast(e.message); }
+        return;
+      }
+      const idx = adminItems.findIndex(x => x.id === id);
+      const to = act === 'up' ? idx - 1 : idx + 1;
+      if (to < 0 || to >= adminItems.length) return;
+      const arr = adminItems.slice();
+      [arr[idx], arr[to]] = [arr[to], arr[idx]];
+      try{
+        await adminFetch('/reorder', { method: 'POST', body: JSON.stringify({ ids: arr.map(x => x.id) }) });
+        await loadAdmin(); await loadMenu();
+      } catch(e){ toast(e.message); }
+    }));
+  });
+}
+
+const ART_OPTS = [['porridge','粥锅'],['beefpot','牛肉锅'],['sushi','寿司'],['thai','泰式'],['grill','铁板'],['western','西餐'],['chinese','中式']];
+const KIND_OPTS = [['light','清淡（绿）'],['spicy','偏辣（红）'],['oil','偏油（黄）']];
+
+function renderForm(r){
+  const d = r || { name:'', branch:'', cuisine:'', price:100, score:4.5, taste_light:3, taste_spicy:0, taste_oil:2,
+                    taste_label:'清淡', taste_kind:'light', reason:'', metro:'', reach:'', tip:'',
+                    dist_km:5, art:'porridge', accent_a:'#FDF1E7', accent_b:'#F8E2D2', photo:'', hidden:false };
+  const box = document.getElementById('adminForm');
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div class="form-item"><label>店名 *</label><input type="text" id="f_name" value="${esc(d.name)}"></div>
+    <div class="grid2">
+      <div class="form-item"><label>分店</label><input type="text" id="f_branch" value="${esc(d.branch)}"></div>
+      <div class="form-item"><label>菜系</label><input type="text" id="f_cuisine" value="${esc(d.cuisine)}"></div>
+    </div>
+    <div class="grid2">
+      <div class="form-item"><label>人均（¥）</label><input type="number" id="f_price" value="${d.price}"></div>
+      <div class="form-item"><label>评分（0 = 不显示）</label><input type="number" step="0.1" id="f_score" value="${d.score}"></div>
+    </div>
+    <div class="grid2">
+      <div class="form-item"><label>离三花国际（km）</label><input type="number" step="0.1" id="f_dist" value="${d.dist_km}"></div>
+      <div class="form-item"><label>角标文案</label><input type="text" id="f_tlabel" value="${esc(d.taste_label)}"></div>
+    </div>
+    <div class="form-item"><label>角标配色</label>
+      <select id="f_tkind">${KIND_OPTS.map(([v,t]) => `<option value="${v}" ${d.taste_kind===v?'selected':''}>${t}</option>`).join('')}</select>
+    </div>
+    <div class="form-item"><label>清淡度 <b id="v_light">${d.taste_light}</b>/5</label>
+      <div class="range-row"><input type="range" min="0" max="5" id="f_light" value="${d.taste_light}"></div></div>
+    <div class="form-item"><label>辣度 <b id="v_spicy">${d.taste_spicy}</b>/5</label>
+      <div class="range-row"><input type="range" min="0" max="5" id="f_spicy" value="${d.taste_spicy}"></div></div>
+    <div class="form-item"><label>油度 <b id="v_oil">${d.taste_oil}</b>/5</label>
+      <div class="range-row"><input type="range" min="0" max="5" id="f_oil" value="${d.taste_oil}"></div></div>
+    <div class="form-item"><label>上榜理由（前台大字）</label><textarea id="f_reason">${esc(d.reason)}</textarea></div>
+    <div class="form-item"><label>最近地铁 + 步行</label><textarea id="f_metro">${esc(d.metro)}</textarea></div>
+    <div class="form-item"><label>从公司怎么过去</label><textarea id="f_reach">${esc(d.reach)}</textarea></div>
+    <div class="form-item"><label>点菜小抄</label><textarea id="f_tip">${esc(d.tip)}</textarea></div>
+    <div class="grid2">
+      <div class="form-item"><label>插画</label>
+        <select id="f_art">${ART_OPTS.map(([v,t]) => `<option value="${v}" ${d.art===v?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="form-item"><label>实拍图地址（可留空）</label><input type="text" id="f_photo" value="${esc(d.photo || '')}"></div>
+    </div>
+    <div class="form-item"><label>隐藏（前台不显示）</label>
+      <select id="f_hidden"><option value="0" ${!d.hidden?'selected':''}>显示</option><option value="1" ${d.hidden?'selected':''}>隐藏</option></select></div>
+    <div class="rows">
+      <button class="btn ghost" id="fCancel">取消</button>
+      <button class="btn primary" id="fSave">保存</button>
+    </div>`;
+
+  ['light','spicy','oil'].forEach(k => {
+    const el = document.getElementById('f_' + k);
+    const out = document.getElementById('v_' + k);
+    el.addEventListener('input', () => out.textContent = el.value);
+  });
+
+  document.getElementById('fCancel').addEventListener('click', () => {
+    box.style.display = 'none'; box.innerHTML = '';
+  });
+  document.getElementById('fSave').addEventListener('click', () => saveForm(r && r.id));
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function saveForm(id){
+  const val = (s) => document.getElementById(s).value.trim();
+  const num = (s) => Number(document.getElementById(s).value || 0);
+  const body = {
+    name: val('f_name'), branch: val('f_branch'), cuisine: val('f_cuisine'),
+    price: num('f_price'), score: num('f_score'), dist_km: num('f_dist'),
+    taste_light: num('f_light'), taste_spicy: num('f_spicy'), taste_oil: num('f_oil'),
+    taste_label: val('f_tlabel') || '清淡', taste_kind: document.getElementById('f_tkind').value,
+    reason: val('f_reason'), metro: val('f_metro'), reach: val('f_reach'), tip: val('f_tip'),
+    art: document.getElementById('f_art').value,
+    accent_a: (editing && editing.accent_a) || '#FDF1E7',
+    accent_b: (editing && editing.accent_b) || '#F8E2D2',
+    photo: val('f_photo') || null,
+    hidden: document.getElementById('f_hidden').value === '1'
+  };
+  if (!body.name){ toast('店名不能空'); return; }
+  try{
+    if (id) await adminFetch('/items/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+    else    await adminFetch('/items', { method: 'POST', body: JSON.stringify(body) });
+    toast('保存好了');
+    await loadAdmin(); await loadMenu();
+  } catch(e){ toast(e.message); }
+}
+
+/* ============================ 事件绑定 ============================ */
+$('#list').addEventListener('click', () => {});          // 占位：卡片各自绑了
+$('#goBtn').addEventListener('click', openConfirm);
+$('#confirmCancel').addEventListener('click', () => $('#confirmMask').classList.remove('show'));
+$('#confirmSend').addEventListener('click', sendChoice);
+$('#doneClose').addEventListener('click', () => { $('#done').classList.remove('show'); picked = null; pick(null); });
+$('#doneBack').addEventListener('click', () => {
+  $('#done').classList.remove('show'); picked = null; pick(null);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+$('#gear').addEventListener('click', openAdmin);
+$('#gateCancel').addEventListener('click', () => $('#gateMask').classList.remove('show'));
+$('#gateGo').addEventListener('click', async () => {
+  const pw = $('#pwInput').value.trim();
+  adminPw = pw;
+  try{
+    await adminFetch('/admin/check', { method: 'POST' });
+    sessionStorage.setItem('date_admin_pw', pw);
+    $('#gateMask').classList.remove('show');
+    $('#pwInput').value = '';
+    $('#admin').classList.add('show');
+    await loadAdmin();
+  } catch(e){
+    adminPw = ''; sessionStorage.removeItem('date_admin_pw');
+    toast(e.message === '密码不对' ? '密码不对' : e.message);
+  }
+});
+$('#adminClose').addEventListener('click', () => { $('#admin').classList.remove('show'); loadMenu(); });
+$('#addBtn').addEventListener('click', () => { editing = null; renderForm(null); });
+$('#pwInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#gateGo').click(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape'){ document.querySelectorAll('.sheet-mask.show').forEach(m => m.classList.remove('show')); } });
+
+loadMenu();
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 # ── 日志 ──────────────────────────────────────────────────
@@ -24,9 +25,10 @@ if not _selfsec_logger.handlers:
     _selfsec_logger.propagate = False  # 避免重复输出
 
 import app.models  # noqa: F401 —— 注册全部模型，create_all 才能看到
-from app.api import chat, insights, memory, messages, onboarding, plans
-from app.database import Base, engine
+from app.api import chat, date, insights, memory, messages, onboarding, plans
+from app.database import Base, async_session, engine
 from app.services import scheduler
+from app.services.date_menu import ensure_seed
 from app.services.deps import ensure_default_user, verify_token
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -37,6 +39,9 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await ensure_default_user()
+    # 约会菜单种子：只在表为空时写一次（后台删光了不会自己长回来）
+    async with async_session() as db:
+        await ensure_seed(db)
     task = scheduler.start()
     try:
         yield
@@ -57,6 +62,17 @@ api_router.include_router(plans.router)
 api_router.include_router(memory.router)
 api_router.include_router(onboarding.router)
 app.include_router(api_router)
+
+# 约会挑餐厅：前台给女朋友看，不能要求 API_TOKEN，所以单独挂
+# （public 无鉴权 / admin 走 X-Date-Password 密码头）
+app.include_router(date.public_router)
+app.include_router(date.admin_router)
+
+
+@app.get("/date", include_in_schema=False)
+async def date_page():
+    """约会挑餐厅页面（给另一半看的短链接）。"""
+    return FileResponse(STATIC_DIR / "date.html")
 
 
 @app.get("/health")
@@ -79,6 +95,6 @@ async def static_revalidate(request, call_next):
     """
     response = await call_next(request)
     path = request.url.path
-    if path in ("/", "/index.html") or path.endswith((".js", ".css", ".html")):
+    if path in ("/", "/index.html", "/date") or path.endswith((".js", ".css", ".html")):
         response.headers["Cache-Control"] = "no-cache"
     return response
