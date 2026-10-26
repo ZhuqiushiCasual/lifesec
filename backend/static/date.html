@@ -362,6 +362,7 @@
     </div>
   </div>
   <div class="admin-body">
+    <div style="font-size:11.5px;color:#A79684;line-height:1.6;margin:0 2px 10px">↑↓ 调整顺序，前台就按这个顺序显示（刷新即见）。</div>
     <div id="adminList"></div>
     <div id="adminForm" style="display:none"></div>
   </div>
@@ -393,6 +394,7 @@ const FILTERS = [
   { key:'all',   label:'全部',     test: () => true },
   { key:'light', label:'清淡',     test: r => r.taste_light >= 4, sort:(a,b)=> b.taste_light - a.taste_light },
   { key:'spicy', label:'能吃辣',   test: r => r.taste_spicy >= 3, sort:(a,b)=> b.taste_spicy - a.taste_spicy },
+  { key:'dist',  label:'按距离',   test: () => true, sort:(a,b)=> a.dist_km - b.dist_km },
   { key:'near',  label:'两边都近', test: r => Math.min(r.dist_km, r.dist_work_km) <= 5 },
   { key:'cheap', label:'人均一百', test: r => r.price <= 110 }
 ];
@@ -532,7 +534,10 @@ function renderFilters(){
 
 function renderList(){
   const f = FILTERS.find(x => x.key === filter) || FILTERS[0];
-  const rows = items.filter(f.test).slice().sort(f.sort || ((a, b) => a.dist_km - b.dist_km));
+  // 顺序只有两个来源：后台排的（items 本身就是 sort 升序）或筛选器显式要求的排序。
+  // 以前这里写了 f.sort || 按距离，结果后台怎么调都不生效 —— 别再偷偷重排。
+  const rows = items.filter(f.test).slice();
+  if (f.sort) rows.sort(f.sort);
   $('#list').innerHTML = rows.length
     ? rows.map(cardHTML).join('')
     : '<div class="empty">这个条件下暂时没有店 —— 换个筛选试试。</div>';
@@ -561,7 +566,7 @@ async function loadMenu(){
     console.error(e); return;
   }
   $('#countNote').textContent = items.length
-    ? `共 ${items.length} 家 · 按离家的距离排`
+    ? `共 ${items.length} 家`
     : '菜单还是空的';
   $('#foot').innerHTML = '口味按「清 / 辣 / 油」分三档，0–5 是主观体感。两个距离都是直线距离：家＝三花国际，公司＝黄龙体育中心。';
   renderFilters(); renderList();
