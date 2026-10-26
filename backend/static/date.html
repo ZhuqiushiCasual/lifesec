@@ -3,30 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#FFF9F5">
+<meta name="theme-color" content="#FBF7F1">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>小小菜单 · 这次你挑</title>
+<title>小小菜单 · 今晚吃什么</title>
 <!--
-  /date —— 约会挑餐厅（给另一半看的页面）
+  /date —— 挑餐厅（selfsec 的一个页面，跟着 static/ 一起托管）
 
   页面职责：
     1. 前台：展示菜单（GET /api/date/menu，不需要 token）→ 挑一家 → 确认弹层里
-       可以改那句话 → POST /api/date/choose，落一条 messages(role=me)，
-       他打开 selfsec 窗口就能看到「我选择 XXX餐厅」。
-    2. 后台：右下角小齿轮（半透明，她基本看不见）长按 / 点击 → 输入密码
+       那句话可以改 → POST /api/date/choose，落一条 messages(role=me)。
+       文案刻意克制：不出现"发给谁""他"这类指向，就是"确认一下"。
+    2. 后台：右上角半透明小齿轮 → 输入密码
        （DATE_ADMIN_PASSWORD，请求头 X-Date-Password）→ 增删改 + 上下移排序。
 
   零依赖零构建，跟着 selfsec 的 static/ 一起被 StaticFiles 托管。
 -->
 <style>
   :root{
-    --paper:#FFF9F5; --card:#FFFFFF;
-    --ink:#4A3B38; --ink2:#8B7772; --ink3:#B9A6A0;
-    --line:#F6E4DE; --line2:#FCF1EC;
-    --pink:#F7A8B8; --pink-d:#E4698A; --rose:#FFF1F4;
-    --mint:#8FCBA5; --amber:#F3C77B;
-    --shadow:0 2px 4px rgba(190,140,140,.06), 0 10px 26px rgba(190,140,140,.10);
-    --shadow-s:0 1px 2px rgba(190,140,140,.06), 0 4px 12px rgba(190,140,140,.07);
+    --paper:#FBF7F1; --card:#FFFFFF;
+    --ink:#3A3129; --ink2:#6E6055; --ink3:#A79684;
+    --line:#F0E6DA; --line2:#F8F2E9;
+    --warm:#E8845A; --warm-d:#C96A42; --amber:#F2B872;
+    --green:#5F8F5F; --red:#C25B4B;
+    --shadow:0 1px 2px rgba(120,90,60,.05), 0 10px 26px rgba(120,90,60,.07);
+    --shadow-s:0 1px 2px rgba(120,90,60,.05), 0 4px 12px rgba(120,90,60,.05);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html{-webkit-text-size-adjust:100%}
@@ -34,8 +34,8 @@
     margin:0;padding:0;color:var(--ink);font-size:15px;line-height:1.68;
     font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",sans-serif;
     background:
-      radial-gradient(560px 320px at 88% -6%, #FFE7EE 0%, rgba(255,231,238,0) 62%),
-      radial-gradient(520px 300px at 4% 4%, #FFF2DA 0%, rgba(255,242,218,0) 58%),
+      radial-gradient(560px 320px at 90% -8%, #FFF3E4 0%, rgba(255,243,228,0) 62%),
+      radial-gradient(520px 300px at 2% 4%, #FDF6EC 0%, rgba(253,246,236,0) 58%),
       var(--paper);
     background-attachment:fixed;
     -webkit-font-smoothing:antialiased;
@@ -47,10 +47,10 @@
   /* ── 顶栏 ── */
   .top{display:flex;align-items:center;justify-content:space-between;padding:16px 2px 6px}
   .brand{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;letter-spacing:.02em;color:var(--ink2)}
-  .brand .hrt{
-    width:30px;height:30px;border-radius:11px;display:grid;place-items:center;font-size:15px;
-    background:linear-gradient(135deg,#FFD9E3,#FFF0DA);
-    box-shadow:0 3px 10px rgba(228,105,138,.18);border:1px solid #FFE3EC;
+  .brand .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:linear-gradient(135deg,var(--warm),var(--amber));
+    box-shadow:0 0 0 4px rgba(232,132,90,.12);
   }
   .gear{
     border:0;background:transparent;color:var(--ink3);opacity:.28;font-size:16px;
@@ -63,7 +63,7 @@
   .hero h1{
     margin:0 0 8px;font-size:27px;line-height:1.28;letter-spacing:-.5px;font-weight:800;
   }
-  .hero h1 .wav{color:var(--pink-d)}
+  .hero h1 em{font-style:normal;color:var(--warm-d)}
   .hero p{margin:0;font-size:13.5px;color:var(--ink2)}
   .hero .note{
     margin-top:11px;display:inline-flex;align-items:center;gap:6px;
@@ -85,7 +85,7 @@
     cursor:pointer;box-shadow:var(--shadow-s);transition:.16s ease;white-space:nowrap;
   }
   .chip:active{transform:scale(.96)}
-  .chip.on{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--pink),var(--pink-d))}
+  .chip.on{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--warm),var(--amber))}
 
   /* ── 卡片 ── */
   .list{display:flex;flex-direction:column;gap:15px;padding:16px 0 8px}
@@ -96,24 +96,23 @@
   }
   @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
   .card:active{transform:scale(.994)}
-  .card.sel{border-color:var(--pink);box-shadow:0 0 0 3px rgba(247,168,184,.28),var(--shadow)}
+  .card.sel{border-color:var(--warm);box-shadow:0 0 0 2px rgba(232,132,90,.25),var(--shadow)}
   .thumb{position:relative;aspect-ratio:16/10;background:#FBF1EC;overflow:hidden}
   .thumb svg,.thumb img{width:100%;height:100%;display:block;object-fit:cover}
   .pill{
-    position:absolute;font-size:11.5px;font-weight:700;border-radius:999px;padding:4px 10px;
+    position:absolute;font-size:11.5px;font-weight:700;border-radius:6px;padding:3px 9px;
     backdrop-filter:blur(6px);
   }
-  .pill.dist{left:10px;top:10px;color:#fff;background:rgba(74,59,56,.55)}
+  .pill.dist{left:10px;top:10px;color:#fff;background:rgba(58,49,41,.58)}
   .pill.taste{right:10px;top:10px;background:rgba(255,255,255,.92);border:1px solid #fff}
   .pill.taste.light{color:#4E8A5C}
   .pill.taste.spicy{color:#C2544A}
   .pill.taste.oil{color:#A67517}
   .tick{
-    position:absolute;left:10px;bottom:10px;width:30px;height:30px;border-radius:50%;
-    display:grid;place-items:center;font-size:14px;color:#fff;
-    background:linear-gradient(135deg,var(--pink),var(--pink-d));
-    box-shadow:0 4px 12px rgba(228,105,138,.35);
-    opacity:0;transform:scale(.6);transition:.18s ease;
+    position:absolute;left:10px;bottom:10px;width:26px;height:26px;border-radius:50%;
+    display:grid;place-items:center;font-size:13px;color:#fff;
+    background:linear-gradient(135deg,var(--warm),var(--warm-d));
+    opacity:0;transform:scale(.7);transition:.16s ease;
   }
   .card.sel .tick{opacity:1;transform:none}
 
@@ -141,11 +140,10 @@
   .why b,.tip b,.go b{display:block;font-size:10.5px;letter-spacing:.12em;color:var(--ink3);font-weight:700;margin-bottom:3px}
   .why p{margin:0}
 
-  .go{background:#FFFDFB;border:1px solid var(--line2);border-radius:12px;padding:10px 12px;margin:0 0 10px}
+  .go{background:#FDFAF5;border:1px solid var(--line2);border-radius:11px;padding:10px 12px;margin:0 0 10px}
   .go div{font-size:12.5px;color:var(--ink2);line-height:1.6}
-  .go div+div{margin-top:5px}
-  .go .far{color:var(--pink-d);font-weight:700}
-  .tip{font-size:12.5px;color:#8A6A3E;background:#FFF8E9;border:1px solid #F7E8C8;border-radius:12px;padding:9px 12px;line-height:1.6}
+  .go div+div{margin-top:5px;padding-top:5px;border-top:1px dashed var(--line)}
+  .tip{font-size:12.5px;color:#8A6A3E;background:#FDF7EA;border:1px solid #F2E5C8;border-radius:11px;padding:9px 12px;line-height:1.6}
   .tip b{color:#A67F33}
 
   /* ── 底部选择条 ── */
@@ -164,50 +162,47 @@
   .bar .pick .v.empty{color:var(--ink3);font-weight:600}
   .go-btn{
     flex:0 0 auto;font:inherit;font-size:15px;font-weight:800;color:#fff;border:0;cursor:pointer;
-    border-radius:15px;padding:13px 22px;letter-spacing:.01em;
-    background:linear-gradient(135deg,#FBA6B8,#E4698A);
-    box-shadow:0 8px 20px rgba(228,105,138,.32);transition:.16s ease;
+    border-radius:13px;padding:13px 22px;
+    background:linear-gradient(135deg,var(--warm),var(--warm-d));
+    box-shadow:0 6px 18px rgba(201,106,66,.26);transition:.16s ease;
   }
   .go-btn:active{transform:scale(.97)}
-  .go-btn[disabled]{background:#EDE1DC;color:#B9A6A0;box-shadow:none;cursor:not-allowed}
+  .go-btn[disabled]{background:#E9E1D6;color:#B3A695;box-shadow:none;cursor:not-allowed}
 
   /* ── 弹层通用 ── */
   .sheet-mask{
-    position:fixed;inset:0;z-index:40;background:rgba(74,59,56,.34);
+    position:fixed;inset:0;z-index:40;background:rgba(58,49,41,.34);
     backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;
     opacity:0;pointer-events:none;transition:opacity .2s ease;
   }
   .sheet-mask.show{opacity:1;pointer-events:auto}
   .sheet{
-    width:100%;max-width:520px;background:var(--card);border-radius:24px 24px 0 0;
+    width:100%;max-width:520px;background:var(--card);border-radius:20px 20px 0 0;
     padding:20px 18px calc(20px + env(safe-area-inset-bottom));
-    transform:translateY(14px);transition:transform .24s cubic-bezier(.2,.8,.3,1);
-    box-shadow:0 -10px 40px rgba(120,80,80,.16);
+    transform:translateY(12px);transition:transform .22s cubic-bezier(.2,.8,.3,1);
+    box-shadow:0 -10px 36px rgba(90,70,50,.14);
   }
   .sheet-mask.show .sheet{transform:none}
   @media(min-width:620px){
     .sheet-mask{align-items:center}
-    .sheet{border-radius:24px;margin:0 16px;max-width:520px}
+    .sheet{border-radius:18px;margin:0 16px;max-width:520px}
   }
-  .sheet h3{margin:0 0 6px;font-size:17px;font-weight:800;letter-spacing:-.2px}
+  .sheet h3{margin:0 0 6px;font-size:16.5px;font-weight:800;letter-spacing:-.2px}
   .sheet .hint{margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6}
   .sheet textarea{
     width:100%;min-height:86px;resize:vertical;font:inherit;font-size:14.5px;color:var(--ink);
-    background:#FFFDFC;border:1.5px solid var(--line);border-radius:14px;padding:11px 13px;
+    background:#FDFBF7;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;
     line-height:1.6;outline:none;
   }
-  .sheet textarea:focus{border-color:var(--pink)}
+  .sheet textarea:focus{border-color:var(--warm)}
   .sheet .rows{display:flex;gap:10px;margin-top:14px}
   .btn{
-    flex:1;font:inherit;font-size:14.5px;font-weight:700;border-radius:14px;padding:12px 10px;
+    flex:1;font:inherit;font-size:14.5px;font-weight:700;border-radius:12px;padding:12px 10px;
     cursor:pointer;border:1.5px solid var(--line);background:#fff;color:var(--ink2);transition:.16s ease;
   }
   .btn:active{transform:scale(.98)}
-  .btn.primary{
-    color:#fff;border-color:transparent;background:linear-gradient(135deg,#FBA6B8,#E4698A);
-    box-shadow:0 8px 18px rgba(228,105,138,.28);
-  }
-  .btn.ghost{background:#FFFDFC}
+  .btn.primary{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--warm),var(--warm-d))}
+  .btn.ghost{background:#FDFBF7}
   .btn.danger{color:#C2544A;border-color:#F6D8D2}
   .btn[disabled]{opacity:.55;cursor:not-allowed;transform:none}
 
@@ -218,12 +213,17 @@
     padding:28px 22px calc(28px + env(safe-area-inset-bottom));text-align:center;
   }
   .done.show{display:flex}
-  .done .env{font-size:52px;line-height:1;margin-bottom:14px;animation:pop .4s ease both}
-  @keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
-  .done h2{margin:0 0 8px;font-size:23px;font-weight:800;letter-spacing:-.3px}
-  .done p{margin:0 0 18px;font-size:13.5px;color:var(--ink2);line-height:1.7}
+  .done .mark{
+    width:54px;height:54px;border-radius:50%;display:grid;place-items:center;margin-bottom:16px;
+    background:linear-gradient(135deg,#FBEFE4,#F7E2CF);border:1px solid #F2DEC8;
+    animation:pop .3s ease both;
+  }
+  .done .mark svg{width:24px;height:24px;stroke:var(--warm-d);stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  @keyframes pop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+  .done h2{margin:0 0 6px;font-size:21px;font-weight:800;letter-spacing:-.3px}
+  .done p{margin:0 0 18px;font-size:13px;color:var(--ink2);line-height:1.7}
   .done .bubble{
-    max-width:330px;background:#fff;border:1px solid var(--line);border-radius:16px 16px 16px 6px;
+    max-width:330px;background:#fff;border:1px solid var(--line);border-radius:12px;
     padding:12px 15px;font-size:14px;box-shadow:var(--shadow-s);color:var(--ink);
     text-align:left;word-break:break-word;
   }
@@ -243,14 +243,14 @@
   .admin-top h2{margin:0;font-size:16px;font-weight:800}
   .admin-top .acts{display:flex;gap:8px;align-items:center}
   .mini{
-    font:inherit;font-size:12.5px;font-weight:700;border-radius:10px;padding:7px 11px;cursor:pointer;
+    font:inherit;font-size:12.5px;font-weight:700;border-radius:9px;padding:7px 11px;cursor:pointer;
     border:1px solid var(--line);background:#fff;color:var(--ink2);
   }
-  .mini.pri{background:linear-gradient(135deg,#FBA6B8,#E4698A);color:#fff;border-color:transparent}
+  .mini.pri{background:linear-gradient(135deg,var(--warm),var(--warm-d));color:#fff;border-color:transparent}
   .admin-body{flex:1 1 auto;overflow-y:auto;padding:12px 14px calc(24px + env(safe-area-inset-bottom))}
   .arow{
     display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);
-    border-radius:14px;padding:10px 11px;margin-bottom:9px;
+    border-radius:12px;padding:10px 11px;margin-bottom:9px;
   }
   .arow .idx{width:22px;flex:0 0 22px;font-size:11px;color:var(--ink3);font-weight:700;text-align:center}
   .arow .info{flex:1;min-width:0}
@@ -258,27 +258,27 @@
   .arow .info .m{font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .arow .ops{display:flex;gap:5px;flex:0 0 auto}
   .icon-btn{
-    width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:#fff;
+    width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#fff;
     color:var(--ink2);font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;
   }
-  .icon-btn:active{background:#FFF3F5}
-  .icon-btn.del{color:#C2544A;border-color:#F6D8D2}
-  .form-item{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+  .icon-btn:active{background:#FDF3EC}
+  .icon-btn.del{color:#C2544A;border-color:#F3D9D3}
+  .form-item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
   .form-item label{display:block;font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.06em;margin-bottom:4px}
   .form-item input[type=text],.form-item input[type=number],.form-item textarea,.form-item select{
-    width:100%;font:inherit;font-size:13.5px;color:var(--ink);background:#FFFDFC;
-    border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;outline:none;
+    width:100%;font:inherit;font-size:13.5px;color:var(--ink);background:#FDFBF7;
+    border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;outline:none;
   }
   .form-item textarea{min-height:64px;resize:vertical;line-height:1.55}
-  .form-item input:focus,.form-item textarea:focus,.form-item select:focus{border-color:var(--pink)}
+  .form-item input:focus,.form-item textarea:focus,.form-item select:focus{border-color:var(--warm)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .range-row{display:flex;align-items:center;gap:10px}
-  .range-row input[type=range]{flex:1;accent-color:var(--pink-d)}
+  .range-row input[type=range]{flex:1;accent-color:var(--warm-d)}
   .range-row b{width:20px;font-size:12px;color:var(--ink2);text-align:right}
   .toast{
     position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translate(-50%,10px);
-    background:rgba(74,59,56,.93);color:#fff;font-size:13px;padding:9px 16px;border-radius:999px;
-    opacity:0;pointer-events:none;transition:.22s ease;z-index:80;white-space:nowrap;
+    background:rgba(58,49,41,.93);color:#fff;font-size:13px;padding:9px 16px;border-radius:8px;
+    opacity:0;pointer-events:none;transition:.2s ease;z-index:80;white-space:nowrap;
   }
   .toast.show{opacity:1;transform:translate(-50%,0)}
   .empty{padding:44px 14px;text-align:center;color:var(--ink3);font-size:13px}
@@ -289,14 +289,14 @@
 
 <div class="wrap">
   <div class="top">
-    <div class="brand"><span class="hrt">♡</span><span id="brandTxt">小小菜单</span></div>
+    <div class="brand"><span class="dot"></span><span id="brandTxt">小小菜单</span></div>
     <button class="gear" id="gear" aria-label="管理">⚙</button>
   </div>
 
   <header class="hero">
-    <h1 id="hello">这次你挑<span class="wav">，</span>我安排 🌷</h1>
-    <p>挑一家你想吃的，剩下的交给我 —— 订位、路线、接你。</p>
-    <div class="note" id="countNote">正在把小店端上来…</div>
+    <h1 id="hello">今晚<em>吃什么</em></h1>
+    <p>挑一家你想去的，剩下的我来。</p>
+    <div class="note" id="countNote">正在加载菜单…</div>
   </header>
 
   <nav class="filters" id="filters"></nav>
@@ -307,35 +307,35 @@
 <div class="bar">
   <div class="inner">
     <div class="pick">
-      <div class="k">你的选择</div>
-      <div class="v empty" id="pickTxt">还没选好，慢慢看</div>
+      <div class="k">已选</div>
+      <div class="v empty" id="pickTxt">还没选</div>
     </div>
-    <button class="go-btn" id="goBtn" disabled>就这家啦 →</button>
+    <button class="go-btn" id="goBtn" disabled>确认这家</button>
   </div>
 </div>
 
 <!-- 确认弹层 -->
 <div class="sheet-mask" id="confirmMask">
   <div class="sheet">
-    <h3>发之前，先看一眼 ♡</h3>
-    <p class="hint">这句话会直接进到他的 selfsec 里。想怎么说都行，直接改就好。</p>
+    <h3>确认一下</h3>
+    <p class="hint">确认之后就不改了。下面这句话可以按自己的说法改。</p>
     <textarea id="confirmText" rows="3"></textarea>
     <div class="rows">
-      <button class="btn ghost" id="confirmCancel">再想想</button>
-      <button class="btn primary" id="confirmSend">发给他 ♡</button>
+      <button class="btn ghost" id="confirmCancel">返回</button>
+      <button class="btn primary" id="confirmSend">确认</button>
     </div>
   </div>
 </div>
 
 <!-- 成功页 -->
 <div class="done" id="done">
-  <div class="env">💌</div>
-  <h2>发出去啦</h2>
-  <p>他打开 selfsec 就能看到这句话。<br>剩下的事，让他表现。</p>
-  <div class="bubble"><div class="who">我</div><div id="doneText"></div></div>
+  <div class="mark"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+  <h2>已确认</h2>
+  <p>记下了。想换随时回来改。</p>
+  <div class="bubble"><div class="who">已记下</div><div id="doneText"></div></div>
   <div class="acts">
-    <button class="btn ghost" id="doneBack">再挑一家</button>
-    <button class="btn primary" id="doneClose">好啦</button>
+    <button class="btn ghost" id="doneBack">重新选</button>
+    <button class="btn primary" id="doneClose">好了</button>
   </div>
 </div>
 
@@ -346,8 +346,8 @@
     <p class="hint">输入密码才能改菜单。</p>
     <textarea id="pwInput" rows="1" placeholder="密码" style="min-height:0;height:46px"></textarea>
     <div class="rows">
-      <button class="btn ghost" id="gateCancel">算了</button>
-      <button class="btn primary" id="gateGo">进去</button>
+      <button class="btn ghost" id="gateCancel">取消</button>
+      <button class="btn primary" id="gateGo">进入</button>
     </div>
   </div>
 </div>
@@ -390,11 +390,11 @@ let adminItems = [];
 let editing = null;      // 正在编辑的 item（null = 新增）
 
 const FILTERS = [
-  { key:'all',   label:'都行',     test: () => true },
-  { key:'light', label:'清淡的',   test: r => r.taste_light >= 4, sort:(a,b)=> b.taste_light - a.taste_light },
-  { key:'spicy', label:'想吃辣',   test: r => r.taste_spicy >= 3, sort:(a,b)=> b.taste_spicy - a.taste_spicy },
-  { key:'near',  label:'近一点',   test: r => r.dist_km <= 5 },
-  { key:'cheap', label:'人均百元', test: r => r.price <= 110 }
+  { key:'all',   label:'全部',     test: () => true },
+  { key:'light', label:'清淡',     test: r => r.taste_light >= 4, sort:(a,b)=> b.taste_light - a.taste_light },
+  { key:'spicy', label:'能吃辣',   test: r => r.taste_spicy >= 3, sort:(a,b)=> b.taste_spicy - a.taste_spicy },
+  { key:'near',  label:'两边都近', test: r => Math.min(r.dist_km, r.dist_work_km) <= 5 },
+  { key:'cheap', label:'人均一百', test: r => r.price <= 110 }
 ];
 
 /* ============================ 插图（纯内联，无外链） ============================ */
@@ -492,28 +492,28 @@ function bars(r){
 
 function cardHTML(r, i){
   const img = r.photo ? `<img src="${esc(r.photo)}" alt="${esc(r.name)}" loading="lazy">` : art(r.art, r.accent_a, r.accent_b);
-  const score = r.score > 0 ? r.score.toFixed(1) : '—';
+  const score = r.score > 0 ? ` · ${r.score.toFixed(1)} 分` : '';
   return `<article class="card ${picked === r.id ? 'sel' : ''}" data-id="${esc(r.id)}" style="animation-delay:${Math.min(i,6) * 45}ms">
     <div class="thumb">
       ${img}
-      <span class="pill dist">${r.dist_km.toFixed(1)} km</span>
+      <span class="pill dist">离家 ${r.dist_km.toFixed(1)} km</span>
       <span class="pill taste ${esc(r.taste_kind)}">${esc(r.taste_label)}</span>
       <span class="tick">✓</span>
     </div>
     <div class="body">
       <h2 class="name">${esc(r.name)}</h2>
-      <p class="sub">${esc(r.cuisine)}<span class="sep">·</span>${esc(r.branch)}</p>
+      <p class="sub">${esc(r.cuisine)}<span class="sep">·</span>${esc(r.branch)}${score}</p>
       <div class="facts">
         <div class="fact"><b>¥${r.price}</b><span>人均</span></div>
-        <div class="fact"><b>${score}</b><span>评分</span></div>
-        <div class="fact"><b>${r.dist_km.toFixed(1)}<span style="font-size:9.5px">km</span></b><span>离你公司</span></div>
+        <div class="fact"><b>${r.dist_km.toFixed(1)}<span style="font-size:9.5px">km</span></b><span>离她家</span></div>
+        <div class="fact"><b>${r.dist_work_km.toFixed(1)}<span style="font-size:9.5px">km</span></b><span>离她公司</span></div>
       </div>
       <div class="taste">${bars(r)}</div>
-      <div class="why"><b>为什么带你吃这家</b><p>${esc(r.reason)}</p></div>
+      <div class="why"><b>为什么是这家</b><p>${esc(r.reason)}</p></div>
       <div class="go">
         <b>怎么去</b>
         <div>${esc(r.metro)}</div>
-        <div class="far">${esc(r.reach)}</div>
+        <div>${esc(r.reach)}</div>
       </div>
       <div class="tip"><b>点菜小抄</b>${esc(r.tip)}</div>
     </div>
@@ -545,7 +545,7 @@ function pick(id){
   $('#list').querySelectorAll('.card').forEach(el => el.classList.toggle('sel', el.dataset.id === picked));
   const t = $('#pickTxt');
   if (item){ t.textContent = item.name; t.classList.remove('empty'); $('#goBtn').disabled = false; }
-  else { t.textContent = '还没选好，慢慢看'; t.classList.add('empty'); $('#goBtn').disabled = true; }
+  else { t.textContent = '还没选'; t.classList.add('empty'); $('#goBtn').disabled = true; }
   if (item) haptic();
 }
 function haptic(){ if (navigator.vibrate) navigator.vibrate(8); }
@@ -561,13 +561,13 @@ async function loadMenu(){
     console.error(e); return;
   }
   $('#countNote').textContent = items.length
-    ? `共 ${items.length} 家 · 都是我们一起吃过的店`
-    : '菜单还是空的，让他去后台加两家';
-  $('#foot').innerHTML = '口味分「清 / 辣 / 油」三档，0–5 是我们自己的体感。距离是他公司过去的直线距离。';
+    ? `共 ${items.length} 家 · 按离家的距离排`
+    : '菜单还是空的';
+  $('#foot').innerHTML = '口味按「清 / 辣 / 油」分三档，0–5 是主观体感。两个距离都是直线距离：家＝三花国际，公司＝黄龙体育中心。';
   renderFilters(); renderList();
 
   const to = new URLSearchParams(location.search).get('to');
-  if (to) $('#hello').innerHTML = `${esc(to)}，这次你挑<span class="wav">，</span>我安排 🌷`;
+  if (to) $('#hello').innerHTML = `${esc(to)}，今晚<em>吃什么</em>`;
 }
 
 /* ============================ 确认 + 发送 ============================ */
@@ -581,9 +581,9 @@ function openConfirm(){
 
 async function sendChoice(){
   const text = $('#confirmText').value.trim();
-  if (!text){ toast('写一句再发给她吧'); return; }
+  if (!text){ toast('写一句再确认'); return; }
   const btn = $('#confirmSend');
-  btn.disabled = true; btn.textContent = '发送中…';
+  btn.disabled = true; btn.textContent = '确认中…';
   try{
     const res = await fetch(`${API}/choose`, {
       method: 'POST',
@@ -599,9 +599,9 @@ async function sendChoice(){
     $('#doneText').textContent = data.text;
     $('#done').classList.add('show');
   } catch(e){
-    toast('没发出去：' + e.message);
+    toast('没成功：' + e.message);
   } finally {
-    btn.disabled = false; btn.textContent = '发给他 ♡';
+    btn.disabled = false; btn.textContent = '确认';
   }
 }
 
@@ -641,7 +641,7 @@ function renderAdminList(){
       <div class="idx">${i + 1}</div>
       <div class="info">
         <div class="n">${esc(r.name)}${r.hidden ? ' <span style="color:#B9A6A0;font-weight:600">（隐藏）</span>' : ''}</div>
-        <div class="m">${esc(r.cuisine)} · ¥${r.price} · ${r.dist_km.toFixed(1)}km</div>
+        <div class="m">${esc(r.cuisine)} · ¥${r.price} · 家 ${r.dist_km.toFixed(1)} / 司 ${r.dist_work_km.toFixed(1)} km</div>
       </div>
       <div class="ops">
         <button class="icon-btn" data-act="up" ${i === 0 ? 'disabled' : ''}>↑</button>
@@ -681,7 +681,7 @@ const KIND_OPTS = [['light','清淡（绿）'],['spicy','偏辣（红）'],['oil
 function renderForm(r){
   const d = r || { name:'', branch:'', cuisine:'', price:100, score:4.5, taste_light:3, taste_spicy:0, taste_oil:2,
                     taste_label:'清淡', taste_kind:'light', reason:'', metro:'', reach:'', tip:'',
-                    dist_km:5, art:'porridge', accent_a:'#FDF1E7', accent_b:'#F8E2D2', photo:'', hidden:false };
+                    dist_km:5, dist_work_km:5, art:'porridge', accent_a:'#FDF1E7', accent_b:'#F8E2D2', photo:'', hidden:false };
   const box = document.getElementById('adminForm');
   box.style.display = 'block';
   box.innerHTML = `
@@ -695,11 +695,13 @@ function renderForm(r){
       <div class="form-item"><label>评分（0 = 不显示）</label><input type="number" step="0.1" id="f_score" value="${d.score}"></div>
     </div>
     <div class="grid2">
-      <div class="form-item"><label>离三花国际（km）</label><input type="number" step="0.1" id="f_dist" value="${d.dist_km}"></div>
-      <div class="form-item"><label>角标文案</label><input type="text" id="f_tlabel" value="${esc(d.taste_label)}"></div>
+      <div class="form-item"><label>离家 km（三花国际）</label><input type="number" step="0.1" id="f_dist" value="${d.dist_km}"></div>
+      <div class="form-item"><label>离公司 km（黄龙体育中心）</label><input type="number" step="0.1" id="f_distw" value="${d.dist_work_km}"></div>
     </div>
-    <div class="form-item"><label>角标配色</label>
-      <select id="f_tkind">${KIND_OPTS.map(([v,t]) => `<option value="${v}" ${d.taste_kind===v?'selected':''}>${t}</option>`).join('')}</select>
+    <div class="grid2">
+      <div class="form-item"><label>角标文案</label><input type="text" id="f_tlabel" value="${esc(d.taste_label)}"></div>
+      <div class="form-item"><label>角标配色</label>
+        <select id="f_tkind">${KIND_OPTS.map(([v,t]) => `<option value="${v}" ${d.taste_kind===v?'selected':''}>${t}</option>`).join('')}</select></div>
     </div>
     <div class="form-item"><label>清淡度 <b id="v_light">${d.taste_light}</b>/5</label>
       <div class="range-row"><input type="range" min="0" max="5" id="f_light" value="${d.taste_light}"></div></div>
@@ -707,9 +709,9 @@ function renderForm(r){
       <div class="range-row"><input type="range" min="0" max="5" id="f_spicy" value="${d.taste_spicy}"></div></div>
     <div class="form-item"><label>油度 <b id="v_oil">${d.taste_oil}</b>/5</label>
       <div class="range-row"><input type="range" min="0" max="5" id="f_oil" value="${d.taste_oil}"></div></div>
-    <div class="form-item"><label>上榜理由（前台大字）</label><textarea id="f_reason">${esc(d.reason)}</textarea></div>
+    <div class="form-item"><label>为什么是这家</label><textarea id="f_reason">${esc(d.reason)}</textarea></div>
     <div class="form-item"><label>最近地铁 + 步行</label><textarea id="f_metro">${esc(d.metro)}</textarea></div>
-    <div class="form-item"><label>从公司怎么过去</label><textarea id="f_reach">${esc(d.reach)}</textarea></div>
+    <div class="form-item"><label>怎么过去（从家出发）</label><textarea id="f_reach">${esc(d.reach)}</textarea></div>
     <div class="form-item"><label>点菜小抄</label><textarea id="f_tip">${esc(d.tip)}</textarea></div>
     <div class="grid2">
       <div class="form-item"><label>插画</label>
@@ -741,7 +743,7 @@ async function saveForm(id){
   const num = (s) => Number(document.getElementById(s).value || 0);
   const body = {
     name: val('f_name'), branch: val('f_branch'), cuisine: val('f_cuisine'),
-    price: num('f_price'), score: num('f_score'), dist_km: num('f_dist'),
+    price: num('f_price'), score: num('f_score'), dist_km: num('f_dist'), dist_work_km: num('f_distw'),
     taste_light: num('f_light'), taste_spicy: num('f_spicy'), taste_oil: num('f_oil'),
     taste_label: val('f_tlabel') || '清淡', taste_kind: document.getElementById('f_tkind').value,
     reason: val('f_reason'), metro: val('f_metro'), reach: val('f_reach'), tip: val('f_tip'),

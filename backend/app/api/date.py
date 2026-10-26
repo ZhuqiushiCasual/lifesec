@@ -88,7 +88,7 @@ async def choose(payload: ChooseIn, db: AsyncSession = Depends(get_db)):
     # 纯粹是给以后做统计/回溯留的结构化线索。
     card: dict = {
         "kind": "record",
-        "title": "约会选定",
+        "title": "选好了",
         "lines": [],
         "meta": {"source": "date-picker"},
     }

@@ -49,7 +49,9 @@ class DateMenuItem(Base):
     reach: Mapped[str] = mapped_column(Text, nullable=False, default="", comment="从三花国际怎么过去")
     tip: Mapped[str] = mapped_column(Text, nullable=False, default="", comment="点菜 / 避坑")
 
-    dist_km: Mapped[float] = mapped_column(Float, nullable=False, default=0, comment="离三花国际直线距离（km）")
+    # 两个距离口径：家 = 三花国际（明月桥路×鸿泰路，彭埠站 A 口）；公司 = 黄龙体育中心
+    dist_km: Mapped[float] = mapped_column(Float, nullable=False, default=0, comment="离家（三花国际）直线距离 km")
+    dist_work_km: Mapped[float] = mapped_column(Float, nullable=False, default=0, comment="离公司（黄龙体育中心）直线距离 km")
 
     # ── 视觉 ──────────────────────────────────────────────
     art: Mapped[str] = mapped_column(

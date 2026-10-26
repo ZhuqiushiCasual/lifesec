@@ -28,6 +28,7 @@ class DateItemBase(BaseModel):
     reach: Optional[str] = None
     tip: Optional[str] = None
     dist_km: Optional[float] = Field(default=None, ge=0, le=100)
+    dist_work_km: Optional[float] = Field(default=None, ge=0, le=100)
     art: Optional[str] = Field(default=None, max_length=24)
     accent_a: Optional[str] = Field(default=None, max_length=16)
     accent_b: Optional[str] = Field(default=None, max_length=16)
