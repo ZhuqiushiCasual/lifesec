@@ -87,6 +87,26 @@ SEED: list[dict] = [
         reason="西湖区日料打卡人气榜第 1。回转带 + 屏幕点单，节奏自由、一人一份不用互相迁就；离黄龙体育中心只有 1.8 km。",
         tip="工作日上午 11:00 或下午 14:30 最稳；周末先线上取号再去。",
     ),
+    dict(
+        name="虾佬九 · 打边炉 · 夜宵排档", branch="西湖文化广场店", cuisine="粤式打边炉 / 海鲜排档",
+        price=100, score=0, taste_light=3, taste_spicy=3, taste_oil=4,
+        taste_label="可清可重", taste_kind="oil", art="porridge",
+        accent_a="#F4EFE6", accent_b="#E8DCC8", dist_km=5.96, dist_work_km=3.13,
+        metro="地铁 1 号线 西湖文化广场站 C 口 步行 549 米（约 7 分钟），中山北路西湖文化广场 8 号一楼",
+        reach="1 号线彭埠上车 4 站直达，约 14 分钟出站",
+        reason="海鲜打边炉 + 夜宵排档：淡水澳龙、生蚝、蟹粉捞饭、土鸡起片打边炉都是招牌，人均 100 吃海鲜不多见 —— 代价是排档声量，适合人多图个热闹。",
+        tip="想清淡就点土鸡起片打边炉 + 清蒸澳龙，避开蒜蓉 / 香辣 / 油焖；晚上 22 点后才是主场。",
+    ),
+    dict(
+        name="庆春里", branch="嘉里中心北区 NL103", cuisine="江浙菜 · 蔬食",
+        price=92, score=4.8, taste_light=4, taste_spicy=1, taste_oil=2,
+        taste_label="清淡", taste_kind="light", art="chinese",
+        accent_a="#F2F4EF", accent_b="#E2E8DC", dist_km=6.78, dist_work_km=2.85,
+        metro="地铁 1/2 号线 凤起路站 C1 口出，步行 220 米；延安路 385 号嘉里中心北区 L1",
+        reach="1 号线彭埠直达 7 站，约 20 分钟出站",
+        reason="拱墅区江浙菜热门榜第 1（4.8 / ¥92）。庆春系的蔬食馆，黑松露炒饭是招牌，日式静谧的小空间，全程无肉也不寡淡。",
+        tip="黑松露炒饭、椒麻豆腐必点；想吃辣提前说，泰式冬阴功可以跳过；工作日午市比晚市好排。",
+    ),
 ]
 
 
