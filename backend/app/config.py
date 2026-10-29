@@ -35,6 +35,28 @@ class Settings:
     morning_hour: int = int(os.environ.get("MORNING_HOUR", "8"))    # 问候
     evening_hour: int = int(os.environ.get("EVENING_HOUR", "21"))   # 问候 + 总结意识
 
+    # ── 采集 / 消息推送（services/ingest、api/ingest）────────────
+    # 每日自动下发一次采集任务；INGEST_ENABLED=0 时只保留手动触发。
+    ingest_enabled: bool = os.environ.get("INGEST_ENABLED", "1").lower() in ("1", "true", "yes")
+    ingest_hour: int = int(os.environ.get("INGEST_HOUR", "7"))
+    ingest_minute: int = int(os.environ.get("INGEST_MINUTE", "10"))
+    # 只看最近 N 小时发布的内容，避免第一次跑把半年旧闻全推上来
+    ingest_lookback_hours: int = int(os.environ.get("INGEST_LOOKBACK_HOURS", "36"))
+    # 单个源每次最多取几条（源配置可覆盖）
+    ingest_max_items: int = int(os.environ.get("INGEST_MAX_ITEMS", "12"))
+    # GitHub 搜索用；不填也能跑（未认证 10 次/分钟）
+    github_token: str = os.environ.get("GITHUB_TOKEN", "")
+
+    # 工作台（/workbench）密码：只保护管理端点，页面本身公开。
+    # 不复用 DATE_ADMIN_PASSWORD（那个是给另一半看的页面），空值 = 工作台禁用。
+    workbench_password: str = os.environ.get("WORKBENCH_PASSWORD", "")
+
+    # Hermes 下发：配置了 webhook 地址就 push；没配置就由 Hermes 侧 cron pull。
+    hermes_webhook_url: str = os.environ.get("HERMES_WEBHOOK_URL", "")
+    hermes_webhook_secret: str = os.environ.get("HERMES_WEBHOOK_SECRET", "")
+    # 下发给 Hermes 的 selfsec 地址（Hermes 回调 / 领任务用）。生产填公网或内网可达地址。
+    selfsec_public_url: str = os.environ.get("SELFSEC_PUBLIC_URL", "http://127.0.0.1:8000")
+
     # ── 记忆层参数 ──────────────────────────────────────────
     # 「总结意识」阈值：新增事件数达到该值即重算画像（也支持定时/手动触发）
     profile_trigger_events: int = int(os.environ.get("PROFILE_TRIGGER_EVENTS", "20"))

@@ -1,7 +1,20 @@
 # Hermes · 新闻任务（selfsec 洞察线的生产者）
 
+> **2026-10-27 更新**：采集链路已落地为「selfsec 控制面 + Hermes 执行面」。
+> 现行接入方式以 **`hermes/skills/selfsec-news/SKILL.md`** 与 **`hermes/README.md`** 为准：
+> 工作台/调度创建任务 → Hermes claim → `python -m app.ingest.runner` 确定性抓取 →
+> LLM 生成总结/详情/影响 → `POST /api/ingest/messages` 写回。
+> 本文保留为**历史背景**（旧版「agent 自己搜索 + 总结」与单条 `/api/insights` 回调），
+> `/api/insights` 仍兼容，但新链路不再使用它。
+
 > **职责边界**：抓取 / 筛选 / 去重由 Hermes 负责；selfsec 只接收结果、落库、生成洞察卡。
 > 本文件是从已删除的 `backend/import_news.py` 中抽出的 prompt 与接口约定，供配置 Hermes 定时任务时使用。
+>
+> **已被取代的部分（2026-10-25 追记）**：本文的"agent 自己搜索 + 总结"链路，工程问题见
+> `docs/采集-历史排查-opencode.md` —— prompt 没有源清单（来源随机、不可复现），且服务器上的
+> `import_news.py --daemon` 在无 TTY 环境里 33 万次调用 opencode 全部失败（EBADF）、空转 121 天。
+> 采集层的替代设计见 `docs/采集-技术选型对比.md`。**回调接口 `POST /api/insights` 本身仍然有效**，
+> 需要改的只是上游怎么产出数据。
 
 ---
 

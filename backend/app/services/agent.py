@@ -22,7 +22,7 @@ from app.models.event import TYPE_FEELING, TYPE_FINANCE, TYPE_PLAN, TYPE_RECORD,
 from app.models.message import KIND_REPLY, KIND_USER, ROLE_ME, ROLE_SECRETARY, Message
 from app.models.plan import Plan
 from app.models.user import User
-from app.services import records
+from app.services import date_visits, records
 from app.services.ai import reply as ai_reply
 from app.services.memory import context as ctx_builder
 from app.services.memory import library as mem_library
@@ -112,6 +112,18 @@ async def handle(db: AsyncSession, user: User, content: str) -> dict:
 
     # 4. 我说的这条：原样进窗口（时间点 = created_at），指向它归入的事件
     db.add(Message(user_id=user.id, role=ROLE_ME, kind=KIND_USER, content=content, ref_event_id=event.id))
+    await db.flush()
+
+    # 4a. 如果这句话是在讲一顿已经发生的饭 / 会面，落一条挂到餐厅上的探店记录。
+    #     判定来自同一次生成（date_visit.is_visit），这里只校验 id、清洗字段、去重。
+    visit = await date_visits.apply(
+        db,
+        user,
+        event,
+        data.get("date_visit"),
+        content=content,
+        restaurants=ctx.restaurants,
+    )
 
     # 4b. 命中待办则生成 plan
     plan = None
@@ -122,6 +134,15 @@ async def handle(db: AsyncSession, user: User, content: str) -> dict:
 
     # 5. 它的回应：挂在同一条事件上，卡片带标签与合并信息
     card = _build_card(etype, event, plan, merged)
+    if card is not None and visit is not None:
+        # 只放进 meta，不改变卡面文案：前台怎么呈现探店记录还没定
+        card["meta"]["date_visit"] = {
+            "id": visit.id,
+            "restaurant_id": visit.restaurant_id,
+            "restaurant_name": visit.restaurant_name,
+            "visited_on": visit.visited_on.isoformat(),
+            "rating": visit.rating,
+        }
     msg = Message(
         user_id=user.id,
         role=ROLE_SECRETARY,
@@ -141,4 +162,12 @@ async def handle(db: AsyncSession, user: User, content: str) -> dict:
     except Exception as e:  # noqa: BLE001 —— 迭代失败不影响本次回应
         log.warning("记忆迭代失败: %s", e)
 
-    return {"reply": msg.content, "card": card, "message_id": msg.id, "event_id": event.id, "merged": merged}
+    return {
+        "reply": msg.content,
+        "card": card,
+        "message_id": msg.id,
+        "event_id": event.id,
+        "merged": merged,
+        "date_visit_id": visit.id if visit is not None else None,
+        "restaurant_id": visit.restaurant_id if visit is not None else None,
+    }

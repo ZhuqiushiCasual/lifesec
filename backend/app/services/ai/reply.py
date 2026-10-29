@@ -44,6 +44,23 @@ REPLY_SYSTEM = """你是这个用户的个人秘书，只服务他一个人。�
     不要为了"更准确"另造近义词（`水下摄影` 和 `潜水摄影` 会把同一档裂成两半）。
     确实是清单里没有的新话题，才允许造新词。
 
+## 约会探店（判断和回应同样重要）
+
+12. 如果这次输入讲的是**已经发生的一顿饭 / 一次会面探店**（去了、吃了、味道怎样、
+    和谁去的），并且能确定是哪家店，就填 `date_visit`，同时 `type` 用 record。
+    只是想吃 / 计划去 / 纠结去哪家，不算探店，`date_visit` 填 null。
+    只笼统说"吃了顿饭"、没提具体哪家店，也填 null（这条仍会作为普通事件记住）。
+13. `restaurant_id` 从下面「约会餐厅清单」里选；清单里没有这家店就填 null，
+    `restaurant_name` 写他说的店名。**不要编造 id。**
+14. `review` 写成对这家店的评价 / 这次会面的要点（口味、环境、服务、值不值、聊了什么），
+    不要复述原话；如果这次输入并入了今天已有的事件，review 要写成**合并后的完整版本**。
+15. `rating` 只在有明确评价时给 1–5 的数字（可以是 4.5）；没提就 null。不要猜。
+16. `dishes` 是他提到的具体菜名（0–8 个）；没提就空数组。
+17. `companion` 是同行人（她 / 他 / 朋友 / 家人 / 同事 / 一个人），
+    `occasion` 是场合（约会 / 会面 / 聚餐 / 工作餐 / 一个人）；没提就 null。
+18. `visited_on` 是就餐日期，格式 YYYY-MM-DD；说"昨天 / 上周六"就换算成具体日期，
+    没说就用「约会餐厅清单」里的今天日期。
+
 只输出 JSON，不要任何多余文字：
 {
   "type": "record | plan | finance | feeling | chat",
@@ -52,7 +69,18 @@ REPLY_SYSTEM = """你是这个用户的个人秘书，只服务他一个人。�
   "content": "这条事件（合并后）的完整表述",
   "entities": {"按需填写，如 sport/duration/amount/category 等；没有就填空对象"},
   "tags": ["标签1", "标签2"],
-  "merge_event_id": "并入的今天已有事件 id；没有就 null"
+  "merge_event_id": "并入的今天已有事件 id；没有就 null",
+  "date_visit": {
+    "is_visit": false,
+    "restaurant_id": "约会餐厅清单里的 id；对不上就 null",
+    "restaurant_name": "店名；restaurant_id 为 null 时尽量写",
+    "visited_on": "YYYY-MM-DD；没说就 null",
+    "rating": "1–5 的数字；没提就 null",
+    "dishes": ["菜名1", "菜名2"],
+    "companion": "同行人；没提就 null",
+    "occasion": "约会 / 会面 / 聚餐 / 工作餐 / 一个人；没提就 null",
+    "review": "对这家店/这次会面的评价或要点；没有就 null"
+  }
 }"""
 
 FALLBACK = {
@@ -63,6 +91,7 @@ FALLBACK = {
     "entities": {},
     "tags": [],
     "merge_event_id": None,
+    "date_visit": None,
 }
 
 
@@ -99,6 +128,7 @@ async def generate(
     if not reply:
         return dict(FALLBACK, content=user_text)
 
+    date_visit = data.get("date_visit")
     return {
         "type": str(data.get("type") or "record"),
         "reply": reply,
@@ -107,4 +137,6 @@ async def generate(
         "entities": data.get("entities") if isinstance(data.get("entities"), dict) else {},
         "tags": data.get("tags") if isinstance(data.get("tags"), list) else [],
         "merge_event_id": _clean_merge_id(data.get("merge_event_id")),
+        # 只保证形状；id 校验 / 字段清洗 / 落库在 services/date_visits.py
+        "date_visit": date_visit if isinstance(date_visit, dict) else None,
     }

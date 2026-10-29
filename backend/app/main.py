@@ -25,11 +25,12 @@ if not _selfsec_logger.handlers:
     _selfsec_logger.propagate = False  # 避免重复输出
 
 import app.models  # noqa: F401 —— 注册全部模型，create_all 才能看到
-from app.api import chat, date, insights, memory, messages, onboarding, plans
+from app.api import chat, date, ingest, insights, memory, messages, onboarding, plans, workbench
 from app.database import Base, async_session, engine
 from app.services import scheduler
 from app.services.date_menu import ensure_seed
 from app.services.deps import ensure_default_user, verify_token
+from app.services.ingest.sources import ensure_seed as ensure_ingest_sources
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -40,8 +41,10 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     await ensure_default_user()
     # 约会菜单种子：只在表为空时写一次（后台删光了不会自己长回来）
+    # 采集源种子：只补缺失的 key，不覆盖工作台里改过的配置
     async with async_session() as db:
         await ensure_seed(db)
+        await ensure_ingest_sources(db)
     task = scheduler.start()
     try:
         yield
@@ -61,6 +64,7 @@ api_router.include_router(insights.router)
 api_router.include_router(plans.router)
 api_router.include_router(memory.router)
 api_router.include_router(onboarding.router)
+api_router.include_router(ingest.router)     # Hermes 执行面（API_TOKEN）
 app.include_router(api_router)
 
 # 约会挑餐厅：前台给女朋友看，不能要求 API_TOKEN，所以单独挂
@@ -68,11 +72,20 @@ app.include_router(api_router)
 app.include_router(date.public_router)
 app.include_router(date.admin_router)
 
+# 工作台：给人用的后台，密码走 X-Workbench-Password，不要求 API_TOKEN
+app.include_router(workbench.router)
+
 
 @app.get("/date", include_in_schema=False)
 async def date_page():
     """约会挑餐厅页面（给另一半看的短链接）。"""
     return FileResponse(STATIC_DIR / "date.html")
+
+
+@app.get("/workbench", include_in_schema=False)
+async def workbench_page():
+    """消息推送后台：源配置 / 任务下发 / 执行情况。"""
+    return FileResponse(STATIC_DIR / "workbench.html")
 
 
 @app.get("/health")
@@ -95,6 +108,6 @@ async def static_revalidate(request, call_next):
     """
     response = await call_next(request)
     path = request.url.path
-    if path in ("/", "/index.html", "/date") or path.endswith((".js", ".css", ".html")):
+    if path in ("/", "/index.html", "/date", "/workbench") or path.endswith((".js", ".css", ".html")):
         response.headers["Cache-Control"] = "no-cache"
     return response

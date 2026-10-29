@@ -5,7 +5,7 @@
 - **public**（不带 API_TOKEN）：这张页面的读者是女朋友，她没有 selfsec 的
   接口 token。所以读菜单、提交选择两个端点走独立的 public_router，
   挂在 `main.py` 里不带 `verify_token` 的那一支。
-- **admin**（密码）：增删改排序要密码，走请求头 `X-Date-Password`，
+- **admin**（密码）：增删改排序、探店记录查询要密码，走请求头 `X-Date-Password`，
   对应 `DATE_ADMIN_PASSWORD`。**不是** API_TOKEN —— 那是给 Hermes 用的，
   不该拿去分享给另一半。
 
@@ -17,13 +17,14 @@ from __future__ import annotations
 
 import secrets
 
-from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.models.date_menu import DateMenuItem
+from app.models.date_visit import DateVisit
 from app.models.message import KIND_USER, ROLE_ME, Message
 from app.schemas.date_menu import (
     ChooseIn,
@@ -31,6 +32,7 @@ from app.schemas.date_menu import (
     DateItemCreate,
     DateItemOut,
     DateItemUpdate,
+    DateVisitOut,
     ReorderIn,
 )
 from app.services.deps import DEFAULT_USER_ID
@@ -123,6 +125,43 @@ async def admin_list(db: AsyncSession = Depends(get_db)):
     return await _ordered(db, include_hidden=True)
 
 
+@admin_router.get("/admin/visits", response_model=list[DateVisitOut], dependencies=[Depends(verify_date_admin)])
+async def list_visits(
+    limit: int = Query(50, ge=1, le=200),
+    restaurant_id: str | None = Query(None, description="只看某家店的探店记录"),
+    db: AsyncSession = Depends(get_db),
+):
+    """探店记录（从对话里长出来的「去过哪、吃得怎么样」）。
+
+    前台怎么展示还没定，先留一个后台查询口，方便核对关联是否正确。
+    """
+    stmt = select(DateVisit).order_by(
+        DateVisit.visited_on.desc(), DateVisit.created_at.desc(), DateVisit.id.desc()
+    )
+    if restaurant_id:
+        stmt = stmt.where(DateVisit.restaurant_id == restaurant_id)
+    rows = list((await db.execute(stmt.limit(limit))).scalars().all())
+    return [
+        DateVisitOut(
+            id=v.id,
+            event_id=v.event_id,
+            restaurant_id=v.restaurant_id,
+            restaurant_name=v.restaurant_name,
+            branch=v.branch or "",
+            cuisine=v.cuisine or "",
+            visited_on=v.visited_on,
+            rating=v.rating,
+            dishes=list(v.dishes or []),
+            companion=v.companion,
+            occasion=v.occasion,
+            review=v.review or "",
+            created_at=v.created_at,
+            updated_at=v.updated_at,
+        )
+        for v in rows
+    ]
+
+
 @admin_router.post("/items", response_model=DateItemOut, status_code=201, dependencies=[Depends(verify_date_admin)])
 async def create_item(payload: DateItemCreate, db: AsyncSession = Depends(get_db)):
     items = await _ordered(db, include_hidden=True)
@@ -151,6 +190,9 @@ async def delete_item(item_id: str, db: AsyncSession = Depends(get_db)):
     row = (await db.execute(select(DateMenuItem).where(DateMenuItem.id == item_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="没有这一条")
+    # 探店记录是历史，不跟着菜单项删：把外键摘掉，店名快照还在。
+    # SQLite 默认不启用外键约束，所以这里显式做，别只依赖 ondelete。
+    await db.execute(update(DateVisit).where(DateVisit.restaurant_id == item_id).values(restaurant_id=None))
     await db.delete(row)
     await db.commit()
     return {"ok": True}

@@ -6,6 +6,13 @@ uvicorn[standard]
 sqlalchemy[asyncio]
 pydantic
 openai
+# 采集 runner / 下发 webhook 直接用（openai 也依赖它，这里显式列出）
+httpx
+
+# 采集降级链：L0 RSS、正文抽取、L1.5 TLS 指纹伪装
+feedparser
+beautifulsoup4
+curl_cffi
 
 # 本地默认数据库（DATABASE_URL 不设时走 SQLite，开箱即跑）
 aiosqlite

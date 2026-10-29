@@ -38,6 +38,15 @@ function dayLabel(iso) {
   return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
 }
 
+function fmtStamp(v) {
+  if (!v) return '';
+  const d = toDate(v);
+  if (isNaN(d)) return '';
+  return `${d.getMonth() + 1} 月 ${d.getDate()} 日 ${String(d.getHours()).padStart(2, '0')}:${String(
+    d.getMinutes()
+  ).padStart(2, '0')}`;
+}
+
 let toastTimer;
 function toast(msg, ms = 1800) {
   const t = $('#toast');
@@ -94,11 +103,58 @@ function tagChips(tags) {
   return `<div class="tags">${list.map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</div>`;
 }
 
+/* 洞察：一条消息存三样东西 —— 总结（卡面）/ 详情（弹层）/ 原文（外链）。 */
+const insightCards = new Map();
+
+function insightMeta(card) {
+  const src = card.meta || {};
+  const lines = card.lines || [];
+  const impactLine = lines.find((l) => String(l).startsWith('影响：')) || '';
+  return {
+    ...src,
+    title: src.title || card.title || '',
+    summary: src.summary || lines[0] || '',
+    impact: src.impact || impactLine.replace(/^影响：/, ''),
+    detail: src.detail || '',
+  };
+}
+
+function rememberInsight(card, fallbackContent) {
+  const meta = insightMeta(card);
+  if (!meta.summary && fallbackContent) meta.summary = fallbackContent;
+  if (meta.event_id) insightCards.set(meta.event_id, meta);
+  return meta;
+}
+
 function cardHTML(card) {
   if (!card) return '';
   const kind = ['record', 'plan', 'greeting', 'insight'].includes(card.kind) ? card.kind : 'record';
   const meta = card.meta || {};
   const title = esc(card.title || '');
+
+  if (kind === 'insight') {
+    const m = rememberInsight(card);
+    const when = fmtStamp(m.published_at);
+    const hot = Number(m.importance || 3) >= 4 ? '<span class="insight-hot">重点</span>' : '';
+    const link = m.source_url
+      ? `<a class="insight-link" href="${esc(m.source_url)}" target="_blank" rel="noreferrer">原文链接 ↗</a>`
+      : '';
+    return `<div class="card insight">
+      <div class="insight-top">
+        <span class="insight-src">${esc(m.source_name || '外部消息')}</span>
+        ${when ? `<span class="insight-when">${esc(when)}</span>` : ''}
+        ${hot}
+      </div>
+      ${card.title ? `<h4 class="insight-title">${esc(card.title)}</h4>` : ''}
+      ${m.summary ? `<p class="insight-summary">${esc(m.summary)}</p>` : ''}
+      ${m.impact ? `<p class="insight-impact"><b>影响</b>${esc(m.impact)}</p>` : ''}
+      ${tagChips(m.tags)}
+      <div class="insight-actions">
+        <button class="insight-more" data-insight="${esc(m.event_id || '')}">详情</button>
+        ${link}
+      </div>
+    </div>`;
+  }
 
   if (kind === 'plan' && meta.plan_id) {
     const done = plans.find((p) => p.id === meta.plan_id)?.status === 'done';
@@ -178,10 +234,20 @@ function hitemHTML(m) {
   const text = m.kind === 'insight'
     ? [m.content, ...lines.slice(1)].filter(Boolean).join('\n')
     : m.content;
-  const url = card.meta && card.meta.source_url;
-  const link = url
-    ? `<div class="hlink">来源：<a href="${esc(url)}" target="_blank" rel="noreferrer">${esc(card.meta.source_name || url)}</a></div>`
-    : '';
+
+  let link = '';
+  if (m.kind === 'insight') {
+    const meta = rememberInsight(card, m.content);
+    const url = meta.source_url;
+    link = `<div class="hlink">
+      <button class="hlink-btn" data-insight="${esc(meta.event_id || '')}">详情</button>
+      ${url ? `<a href="${esc(url)}" target="_blank" rel="noreferrer">原文 ↗</a>` : ''}
+    </div>`;
+  } else if (card.meta && card.meta.source_url) {
+    link = `<div class="hlink">来源：<a href="${esc(card.meta.source_url)}" target="_blank" rel="noreferrer">${esc(
+      card.meta.source_name || card.meta.source_url
+    )}</a></div>`;
+  }
   const count = m.merged_count > 1 ? `<span class="hcount">合了 ${m.merged_count} 条消息</span>` : '';
 
   return `<div class="hitem ${cls}">
@@ -241,6 +307,38 @@ function openDrawer() {
 
 function closeDrawer() {
   $('#drawer').hidden = true;
+}
+
+/* ---------- 洞察详情（总结 / 详情 / 原文） ---------- */
+function openInsight(id) {
+  const m = insightCards.get(id);
+  if (!m) {
+    toast('这条消息没有详情');
+    return;
+  }
+  $('#insight-title').textContent = m.title || '外部消息';
+  const bits = [m.source_name, m.category === 'finance' ? '金融' : m.category === 'tech' ? '科技' : m.category, fmtStamp(m.published_at)].filter(Boolean);
+  $('#insight-meta').textContent = bits.join(' · ');
+  const detail = m.detail || '';
+  $('#insight-summary').textContent = m.summary || detail || '（这条消息没有摘要）';
+  const wrap = $('#insight-detail-wrap');
+  wrap.hidden = !detail;
+  $('#insight-detail').textContent = detail;
+  $('#insight-tags').innerHTML = tagChips(m.tags);
+  const a = $('#insight-link');
+  if (m.source_url) {
+    a.href = m.source_url;
+    a.hidden = false;
+  } else {
+    a.hidden = true;
+    a.removeAttribute('href');
+  }
+  $('#insight-modal').hidden = false;
+  $('#insight-body').scrollTop = 0;
+}
+
+function closeInsight() {
+  $('#insight-modal').hidden = true;
 }
 
 /* ---------- 加载 ---------- */
@@ -474,7 +572,20 @@ $('#drawer').addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('#onboard').hidden) return closeOnboard();
+  if (!$('#insight-modal').hidden) return closeInsight();
   if (!$('#drawer').hidden) closeDrawer();
+});
+
+/* 详情按钮在窗口流和回溯里都有，统一用事件委托 */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-insight]');
+  if (!btn || !btn.dataset.insight) return;
+  e.preventDefault();
+  openInsight(btn.dataset.insight);
+});
+on('#insight-close', 'click', closeInsight);
+on('#insight-modal', 'click', (e) => {
+  if (e.target.id === 'insight-modal') closeInsight();
 });
 $('#drawer-tabs').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-f]');

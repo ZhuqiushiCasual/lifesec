@@ -21,8 +21,12 @@ selfsec 的设计约束只有一条：**每次输入都必须换来一句话**�
 cd backend
 pip install -i https://mirrors.aliyun.com/pypi/simple -r requirements.txt   # 直连 pypi.org 在国内很慢
 cp .env.example .env        # 填 OPENAI_API_KEY；不填 DATABASE_URL 就走本地 SQLite
+                            # 采集后台还要设 WORKBENCH_PASSWORD（不设 = /workbench 禁用）
 python startup.py           # http://localhost:8000
 ```
+
+- 前台：`/`（聊天窗口，洞察卡带总结 / 详情 / 原文链接）
+- 采集后台：`/workbench`（源、任务下发、执行情况；密码是 `WORKBENCH_PASSWORD`）
 
 零配置起步：默认 SQLite，表结构和用户自动创建。
 生产用 MySQL 时把 `DATABASE_URL` 换成 `mysql+asyncmy://...`。
@@ -44,13 +48,20 @@ Hermes  ─┘                     ↑
                        4.2 事实统计  实时，纯 SQL，提供"比较"
                        4.3 洞察记忆  外部驱动
                        4.4 会话短期  最近 N 轮，指代消解
+
+采集链路（消息推送）：
+/workbench 或每日 07:10 → ingest_task
+   → push(HMAC webhook) / pull(GET /api/ingest/tasks/next)
+   → Hermes skill → python -m app.ingest.runner（确定性抓取，不调模型）
+   → LLM 生成总结/详情/影响 → POST /api/ingest/messages → 前台洞察卡
 ```
 
 - **唯一入口**：`POST /api/chat`。记录、规划、问候走的都是同一条管道
 - **唯一输出形式**：一句话 + 卡片。卡片出现在窗口内，不另开页面
 - **一次 LLM 调用**：意图判定、字段抽取、生成回应在同一次调用里完成
 
-详细设计见 `docs/PRD-v2.md`，架构图见 `docs/架构-v1.html`。
+详细设计见 `docs/PRD-v2.md` 与 `docs/设计-消息推送.md`，架构图见 `docs/架构-v1.html`。
+Hermes 侧的 skill 与接入方式见 `hermes/README.md`、`hermes/skills/selfsec-news/SKILL.md`。
 
 ## 技术栈
 
@@ -64,4 +75,7 @@ Hermes  ─┘                     ↑
 
 ## 边界（明确不做）
 
-自由多轮陪聊 · 自建抓取管线 · 趋势图表 / 日报评分 · 多用户 / 登录 · 语音输入
+自由多轮陪聊 · 常驻抓取服务 · 趋势图表 / 日报评分 · 多用户 / 登录 · 语音输入
+
+> 采集不是「没有」：源配置、任务、执行记录在 selfsec，抓取由 Hermes 侧的确定性 runner 执行；
+> selfsec 进程本身不跑爬虫。

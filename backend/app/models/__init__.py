@@ -1,5 +1,7 @@
 from app.models.date_menu import DateMenuItem
+from app.models.date_visit import DateVisit
 from app.models.event import Event
+from app.models.ingest import IngestRun, IngestSource, IngestTask
 from app.models.job import JobRun
 from app.models.library import TagAlias, TagIndex
 from app.models.memory import MemoryProfile, ProfileVersion
@@ -18,4 +20,8 @@ __all__ = [
     "TagAlias",
     "JobRun",
     "DateMenuItem",
+    "DateVisit",
+    "IngestSource",
+    "IngestTask",
+    "IngestRun",
 ]

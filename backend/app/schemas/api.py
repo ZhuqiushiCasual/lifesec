@@ -27,6 +27,8 @@ class ChatResponse(BaseModel):
     message_id: str
     event_id: Optional[str] = None    # 这条输入归入/新建的事件
     merged: bool = False              # 是并入了今天已有的事件，还是新建了一条
+    date_visit_id: Optional[str] = None   # 命中探店时，落下的 date_visits 记录
+    restaurant_id: Optional[str] = None   # 关联到的约会菜单项（对不上菜单时为空）
 
 
 # ── POST /api/insights（Hermes 回调）──────────────────────

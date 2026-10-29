@@ -20,6 +20,11 @@ v3（画像 + 馆藏）追加覆盖：
   · 画像分节 + provenance + 版本历史 + 硬上限（1500 字）
   · 防漂移：没有新增就不重写画像
 
+v4（约会探店）追加覆盖：
+
+  · 聊天里说「去吃了」→ date_visits 关联 date_menu.id + 当天事件
+  · 同店同日补充只更新一条；未知店保留店名快照；计划中的饭局不落记录
+
 用法：cd backend && python smoke_test.py
 """
 
@@ -44,6 +49,8 @@ if "DATABASE_URL" not in os.environ:
 os.environ["SCHEDULER_ENABLED"] = "0"
 os.environ["API_TOKEN"] = ""                   # 关闭鉴权，简化测试
 os.environ["PROFILE_TRIGGER_EVENTS"] = "999"   # 避免中途自动刷画像，测试里手动触发
+os.environ["WORKBENCH_PASSWORD"] = "smoke-wb"  # 工作台独立密码
+os.environ["HERMES_WEBHOOK_URL"] = ""          # 不下发，任务停 queued 由测试手动 claim
 
 import httpx  # noqa: E402
 from sqlalchemy import select  # noqa: E402
@@ -66,12 +73,18 @@ def note(name: str, detail: str) -> None:
 
 async def setup() -> None:
     import app.models  # noqa: F401
-    from app.database import Base, engine
+    from app.database import Base, async_session, engine
+    from app.services.date_menu import ensure_seed as ensure_date_menu
     from app.services.deps import ensure_default_user
+    from app.services.ingest.sources import ensure_seed as ensure_ingest_sources
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await ensure_default_user()
+    # ASGITransport 不跑 lifespan，源种子 / 约会菜单种子要手动补
+    async with async_session() as db:
+        await ensure_date_menu(db)
+        await ensure_ingest_sources(db)
 
 
 async def run() -> None:
@@ -81,7 +94,7 @@ async def run() -> None:
     from app.models.user import User
     from app.services import records, scheduler
     from app.services.deps import DEFAULT_USER_ID
-    from app.utils import now_local
+    from app.utils import now_local, today_local
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
@@ -447,6 +460,409 @@ async def run() -> None:
         check("事件线也是最近 3 条（最新事件在里面）",
               bool(events) and events[-1]["id"] == newest_ev.id,
               f"{len(events)} 条 / 最新 {events[-1]['content'][:20] if events else ''}")
+
+
+        # ───────────────────── v2.1：消息推送 / 采集链路 ─────────────────────
+        print("\n[18] 采集任务：工作台下发 → Hermes 领取 → 运行记录 → 收尾")
+        wb = {"X-Workbench-Password": "smoke-wb"}
+        r = await c.get("/api/workbench/check")
+        check("工作台无密码被拒", r.status_code == 401, r.text[:120])
+        r = await c.get("/api/workbench/check", headers=wb)
+        check("工作台密码正确放行", r.status_code == 200, r.text[:120])
+
+        r = await c.get("/api/workbench/sources", headers=wb)
+        sources = r.json()
+        check("内置五个源已就位",
+              {"jiqizhixin", "qbitai", "infoq", "aiera", "github"} <= {s["key"] for s in sources},
+              str([s["key"] for s in sources]))
+        qbit = next((s for s in sources if s["key"] == "qbitai"), None)
+        check("量子位源存在且启用", bool(qbit) and qbit["enabled"])
+        if qbit:
+            r = await c.patch(f"/api/workbench/sources/{qbit['id']}", json={"enabled": False}, headers=wb)
+            check("工作台可停用源", r.status_code == 200 and r.json()["enabled"] is False)
+            r = await c.patch(f"/api/workbench/sources/{qbit['id']}", json={"enabled": True}, headers=wb)
+            check("工作台可重新启用源", r.status_code == 200 and r.json()["enabled"] is True)
+
+        r = await c.post(
+            "/api/workbench/tasks",
+            json={"source_keys": ["qbitai"], "trigger": "manual"},
+            headers=wb,
+        )
+        check("工作台创建任务 201", r.status_code == 201, r.text[:160])
+        task = r.json()
+        task_id = task["id"]
+        check("任务初始为 queued（未配 webhook 时不假装下发）", task["status"] == "queued", task["status"])
+
+        r = await c.post(f"/api/ingest/tasks/{task_id}/claim?worker=smoke")
+        check("Hermes 可领取任务", r.status_code == 200, r.text[:160])
+        claimed = r.json()
+        check("领取后任务 running", claimed["task"]["status"] == "running", claimed["task"]["status"])
+        check("领取响应带回源配置", any(s["key"] == "qbitai" for s in claimed["sources"]))
+        check("领取响应带回回调地址", bool(claimed.get("api_base")))
+
+        r = await c.post(
+            f"/api/ingest/tasks/{task_id}/runs",
+            json={
+                "source_key": "qbitai",
+                "source_name": "量子位",
+                "status": "succeeded",
+                "fetch_level": "L1",
+                "items_found": 2,
+                "detail": {"elapsed_ms": 1200},
+            },
+        )
+        check("单源运行记录可上报", r.status_code == 200, r.text[:160])
+        check("运行记录带层级与条数",
+              r.json()["fetch_level"] == "L1" and r.json()["items_found"] == 2)
+
+        print("\n[19] 消息写回：新增 / 幂等 / 更新 / 已读状态保留")
+        item_a = {
+            "source_key": "qbitai",
+            "source_name": "量子位",
+            "title": "Anthropic 递交 335 页招股书",
+            "summary": "Anthropic 公开招股书，披露财务与风险信息。",
+            "detail": "第一段：收入与亏损。\n\n第二段：上市时间表。",
+            "impact": "AI 公司上市窗口打开。",
+            "category": "tech",
+            "topics": ["Anthropic", "IPO"],
+            "importance": 5,
+            "source_url": "https://example.com/news/a?utm_source=rss&spm=abc",
+            "published_at": "2026-10-27 00:06:31",
+            "fetch_level": "L1",
+        }
+        item_b = {
+            "source_key": "qbitai",
+            "source_name": "量子位",
+            "title": "另一个消息（用 url 字段）",
+            "summary": "runner 中间格式用 url，写回时也应认。",
+            "url": "https://example.com/news/b",
+            "category": "tech",
+        }
+        batch = {"task_id": task_id, "items": [item_a, item_b]}
+        r = await c.post("/api/ingest/messages", json=batch)
+        check("批量写回 200", r.status_code == 200, r.text[:200])
+        out = r.json()
+        check("两条都是新建", out["created"] == 2 and out["accepted"] == 2, str(out))
+        a_id, b_id = out["event_ids"][0], out["event_ids"][1]
+
+        r = await c.get(f"/api/ingest/messages/{a_id}")
+        msg = r.json()
+        check("source_url 已规范化（去掉 utm/spm）",
+              msg["source_url"] == "https://example.com/news/a", msg["source_url"])
+        check("总结 / 详情 / 影响都落了库",
+              bool(msg["summary"]) and bool(msg["detail"]) and bool(msg["impact"]))
+        check("重要性保留", msg["importance"] == 5)
+
+        r = await c.post("/api/ingest/messages", json=batch)
+        out2 = r.json()
+        check("同一批重跑 → 幂等跳过，不重复建卡",
+              out2["created"] == 0 and out2["skipped"] == 2, str(out2))
+        check("幂等命中仍回传已有 event_id", set(out2["event_ids"]) == {a_id, b_id})
+
+        r = await c.patch(f"/api/ingest/messages/{a_id}", json={"status": "hidden"})
+        check("消息可隐藏", r.status_code == 200 and r.json()["status"] == "hidden")
+
+        changed = dict(item_a, summary="更新后的总结")
+        r = await c.post("/api/ingest/messages", json={"task_id": task_id, "items": [changed]})
+        check("内容变化 → 计为 updated", r.json()["updated"] == 1, str(r.json()))
+        r = await c.get(f"/api/ingest/messages/{a_id}")
+        check("重跑不会把已隐藏打回 new", r.json()["status"] == "hidden", r.json()["status"])
+        check("更新后的总结生效", r.json()["summary"] == "更新后的总结")
+
+        print("\n[20] 前台洞察卡：总结 / 详情 / 原文链接")
+        r = await c.get("/api/messages?filter=insight&limit=100")
+        cards = r.json()
+        card = next((m for m in cards if (m.get("card") or {}).get("meta", {}).get("event_id") == a_id), None)
+        check("洞察卡出现在窗口流（filter=insight）", card is not None)
+        if card:
+            meta = card["card"]["meta"]
+            check("卡片带总结", meta.get("summary") == "更新后的总结", str(meta.get("summary"))[:40])
+            check("卡片带详情（弹层用）", bool(meta.get("detail")))
+            check("卡片带原文链接", meta.get("source_url") == "https://example.com/news/a")
+            check("卡片带来源徽标", meta.get("source_name") == "量子位")
+
+        index_html = (HERE / "static" / "index.html").read_text(encoding="utf-8")
+        app_js = (HERE / "static" / "app.js").read_text(encoding="utf-8")
+        check("前台有洞察详情弹层",
+              all(k in index_html for k in ("insight-modal", "insight-summary", "insight-detail", "insight-link")))
+        check("前台脚本接了详情打开逻辑", "openInsight" in app_js and "data-insight" in app_js)
+
+        print("\n[21] 消息合并 / 删除")
+        item_c = {
+            "source_key": "qbitai",
+            "source_name": "量子位",
+            "title": "同一事件 · 转载",
+            "summary": "转载版本的总结。",
+            "detail": "转载版本的详情。",
+            "topics": ["Anthropic"],
+            "source_url": "https://example.com/news/c",
+        }
+        r = await c.post("/api/ingest/messages", json={"items": [item_c]})
+        c_id = r.json()["event_ids"][0]
+        r = await c.post(
+            "/api/ingest/messages/merge",
+            json={"primary_id": a_id, "duplicate_ids": [c_id], "title": "合并后的标题"},
+        )
+        check("合并 200", r.status_code == 200, r.text[:200])
+        merged = r.json()
+        check("合并后的标题生效", merged["title"] == "合并后的标题", merged["title"])
+        check("重复项详情并入主条", "转载版本的详情" in (merged.get("detail") or ""))
+        r = await c.get(f"/api/ingest/messages/{c_id}")
+        check("重复项已删除", r.status_code == 404, str(r.status_code))
+
+        r = await c.post(
+            "/api/ingest/messages/merge",
+            json={"primary_id": a_id, "duplicate_ids": ["不存在的-id"]},
+        )
+        check("合并含不存在的 id → 整次 404（不半途生效）", r.status_code == 404, str(r.status_code))
+
+        r = await c.delete(f"/api/ingest/messages/{b_id}")
+        check("消息可删除", r.status_code == 200 and r.json().get("ok"))
+        check("删除后再查 404", (await c.get(f"/api/ingest/messages/{b_id}")).status_code == 404)
+
+        print("\n[22] 任务收尾与工作台总览")
+        r = await c.post(
+            f"/api/ingest/tasks/{task_id}/finish",
+            json={"status": "succeeded", "stats": {"written": 2}},
+        )
+        check("任务可收尾", r.status_code == 200 and r.json()["status"] == "succeeded", r.text[:160])
+
+        r = await c.get(f"/api/ingest/tasks/{task_id}")
+        detail = r.json()
+        check("任务详情带运行记录", len(detail["runs"]) == 1)
+        run = detail["runs"][0]
+        check("运行记录被补齐新增/更新条数",
+              run["items_new"] >= 2 and run["items_updated"] >= 1,
+              f"new={run['items_new']} updated={run['items_updated']}")
+
+        r = await c.get("/api/workbench/overview", headers=wb)
+        ov = r.json()
+        check("工作台总览 200", r.status_code == 200)
+        check("总览能看到任务状态", ov["tasks"].get("succeeded", 0) >= 1, str(ov["tasks"]))
+        check("总览能看到消息量", ov["messages"]["total"] >= 1, str(ov["messages"]))
+        check("总览返回调度与下发配置", "schedule" in ov["config"] and "dispatch" in ov["config"])
+
+        print("\n[23] 约会探店：聊天里说「去吃了」→ 关联到菜单里的店")
+        from datetime import timedelta  # noqa: PLC0415
+
+        from app.models.date_menu import DateMenuItem  # noqa: PLC0415
+        from app.models.date_visit import DateVisit  # noqa: PLC0415
+        from app.services.ai import reply as ai_reply  # noqa: PLC0415
+
+        today = today_local()
+        tomorrow = today + timedelta(days=1)
+        async with async_session() as db:
+            restaurant = (
+                await db.execute(select(DateMenuItem).order_by(DateMenuItem.sort, DateMenuItem.id))
+            ).scalars().first()
+        check("约会菜单有种子数据", restaurant is not None)
+
+        short = restaurant.name.split("·")[0].strip()
+        captured: dict = {}
+        original_generate = ai_reply.generate
+
+        async def fake_visit_generate(memory_block, history, user_text, existing_tags=None):
+            captured["memory_block"] = memory_block
+            return {
+                "type": "record",
+                "reply": "梅溪徐记的牛肉记下了。",
+                "title": None,
+                "content": f"今天和她在{short}吃饭，牛肉很嫩。",
+                "entities": {"restaurant": restaurant.name},
+                "tags": ["约会", "探店"],
+                "merge_event_id": None,
+                "date_visit": {
+                    "is_visit": True,
+                    "restaurant_id": restaurant.id,
+                    "restaurant_name": restaurant.name,
+                    "visited_on": today.isoformat(),
+                    "rating": 4.5,
+                    "dishes": ["鲜切牛肉", "沙茶酱"],
+                    "companion": "她",
+                    "occasion": "约会",
+                    "review": "牛肉很嫩，清汤锅底不油。",
+                },
+            }
+
+        ai_reply.generate = fake_visit_generate
+        try:
+            r = await c.post("/api/chat", json={"content": f"今天和她在{short}吃饭，牛肉很嫩"})
+        finally:
+            ai_reply.generate = original_generate
+        check("探店对话 200", r.status_code == 200, r.text[:200])
+        first = r.json()
+        check("返回 date_visit_id", bool(first.get("date_visit_id")))
+        check("返回关联的餐厅 id", first.get("restaurant_id") == restaurant.id)
+        check("Context 注入了约会餐厅清单", restaurant.name in (captured.get("memory_block") or ""))
+
+        async with async_session() as db:
+            visit = (
+                await db.execute(select(DateVisit).where(DateVisit.id == first.get("date_visit_id")))
+            ).scalar_one_or_none()
+            check("探店记录落库", visit is not None)
+            if visit is not None:
+                check("探店记录指向菜单项", visit.restaurant_id == restaurant.id)
+                check("店名 / 分店快照落库",
+                      visit.restaurant_name == restaurant.name and visit.branch == restaurant.branch)
+                check("评分 / 菜名 / 同行人 / 场合落库",
+                      visit.rating == 4.5 and visit.dishes == ["鲜切牛肉", "沙茶酱"]
+                      and visit.companion == "她" and visit.occasion == "约会")
+                check("探店记录挂到事件上", visit.event_id == first.get("event_id"))
+                check("就餐日期来自模型", visit.visited_on == today)
+
+        # 同一家店同一天再补充：id 故意给错，靠店名本地兜底；记录只更新不新增
+        async def fake_update_generate(memory_block, history, user_text, existing_tags=None):
+            return {
+                "type": "record",
+                "reply": "吊龙也记下了。",
+                "title": None,
+                "content": f"今天和她在{short}吃饭，牛肉很嫩；吊龙和沙茶酱都不错。",
+                "entities": {"restaurant": restaurant.name},
+                "tags": ["约会", "探店"],
+                "merge_event_id": first.get("event_id"),
+                "date_visit": {
+                    "is_visit": True,
+                    "restaurant_id": "不存在的菜单-id",
+                    "restaurant_name": short,
+                    "visited_on": today.isoformat(),
+                    "rating": 5,
+                    "dishes": ["吊龙"],
+                    "companion": "她",
+                    "occasion": "约会",
+                    "review": "牛肉很嫩；吊龙和沙茶酱都不错。",
+                },
+            }
+
+        ai_reply.generate = fake_update_generate
+        try:
+            r = await c.post("/api/chat", json={"content": f"还是{short}，吊龙也不错"})
+        finally:
+            ai_reply.generate = original_generate
+        second = r.json()
+        check("补充时返回同一条探店记录",
+              second.get("date_visit_id") == first.get("date_visit_id"))
+        async with async_session() as db:
+            visits = (
+                await db.execute(select(DateVisit).where(DateVisit.restaurant_id == restaurant.id))
+            ).scalars().all()
+            check("同店同日只保留一条探店记录", len(visits) == 1, f"{len(visits)} 条")
+            if visits:
+                v = visits[0]
+                check("评价被合并后的完整版本替换", "吊龙" in v.review and "沙茶酱" in v.review)
+                check("菜名去重合并", set(v.dishes or []) == {"鲜切牛肉", "沙茶酱", "吊龙"})
+                check("评分被更新", v.rating == 5)
+
+        # 菜单里没有的店：保留店名快照，restaurant_id 为空
+        async def fake_unknown_generate(memory_block, history, user_text, existing_tags=None):
+            return {
+                "type": "record",
+                "reply": "海底捞记下了。",
+                "title": None,
+                "content": "晚上和朋友去海底捞，服务不错。",
+                "entities": {},
+                "tags": ["聚餐"],
+                "merge_event_id": None,
+                "date_visit": {
+                    "is_visit": True,
+                    "restaurant_id": "菜单里没有的-id",
+                    "restaurant_name": "海底捞",
+                    "visited_on": today.isoformat(),
+                    "rating": 4,
+                    "dishes": [],
+                    "companion": "朋友",
+                    "occasion": "聚餐",
+                    "review": "服务不错。",
+                },
+            }
+
+        ai_reply.generate = fake_unknown_generate
+        try:
+            r = await c.post("/api/chat", json={"content": "晚上和朋友去海底捞，服务不错"})
+        finally:
+            ai_reply.generate = original_generate
+        unknown = r.json()
+        check("菜单里没有的店也保留记录", bool(unknown.get("date_visit_id")))
+        check("对不上菜单时 restaurant_id 为空", unknown.get("restaurant_id") is None)
+        async with async_session() as db:
+            v = (
+                await db.execute(select(DateVisit).where(DateVisit.id == unknown.get("date_visit_id")))
+            ).scalar_one_or_none()
+            check("未知店保留店名快照",
+                  v is not None and v.restaurant_name == "海底捞" and v.restaurant_id is None)
+
+        # 未来日期 / is_visit=false：不落探店记录（普通事件仍然照记）
+        async def fake_future_generate(memory_block, history, user_text, existing_tags=None):
+            return {
+                "type": "plan",
+                "reply": "周六去吃记下了。",
+                "title": "周六去吃饭",
+                "content": "周六想去吃一家店。",
+                "entities": {},
+                "tags": ["计划"],
+                "merge_event_id": None,
+                "date_visit": {
+                    "is_visit": True,
+                    "restaurant_id": None,
+                    "restaurant_name": "周六的店",
+                    "visited_on": tomorrow.isoformat(),
+                    "rating": None,
+                    "dishes": [],
+                    "companion": "她",
+                    "occasion": "约会",
+                    "review": None,
+                },
+            }
+
+        ai_reply.generate = fake_future_generate
+        try:
+            r = await c.post("/api/chat", json={"content": "周六想去吃一家店"})
+        finally:
+            ai_reply.generate = original_generate
+        future = r.json()
+        check("计划中的饭局不落探店记录", future.get("date_visit_id") is None)
+
+        async def fake_not_visit_generate(memory_block, history, user_text, existing_tags=None):
+            return {
+                "type": "record",
+                "reply": "记下了。",
+                "title": None,
+                "content": user_text,
+                "entities": {},
+                "tags": [],
+                "merge_event_id": None,
+                "date_visit": {
+                    "is_visit": False,
+                    "restaurant_id": restaurant.id,
+                    "restaurant_name": restaurant.name,
+                    "visited_on": today.isoformat(),
+                    "rating": None,
+                    "dishes": [],
+                    "companion": None,
+                    "occasion": None,
+                    "review": None,
+                },
+            }
+
+        ai_reply.generate = fake_not_visit_generate
+        try:
+            r = await c.post("/api/chat", json={"content": f"下次想吃{short}"})
+        finally:
+            ai_reply.generate = original_generate
+        check("is_visit=false 不落探店记录", r.json().get("date_visit_id") is None)
+
+        if settings.date_admin_password:
+            r = await c.get(
+                f"/api/date/admin/visits?restaurant_id={restaurant.id}",
+                headers={"X-Date-Password": settings.date_admin_password},
+            )
+            check("后台按店查询探店记录 200", r.status_code == 200, r.text[:200])
+            rows = r.json()
+            check("后台返回这家店的探店记录",
+                  len(rows) == 1 and rows[0]["restaurant_id"] == restaurant.id, str(rows[:1]))
+            if rows:
+                check("后台记录带合并后的评价", "吊龙" in rows[0]["review"])
+        else:
+            note("未配置 DATE_ADMIN_PASSWORD", "跳过后台探店查询")
 
 
 async def main() -> None:

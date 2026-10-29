@@ -10,10 +10,17 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.date_menu import DateMenuItem
+from app.utils import today_local
+
+# 注入 prompt 的菜单项上限。店名 + 分店 + 菜系一行，80 行约 4KB；
+# 正常只有十来家，设上限只是防止后台误操作把 Context 撑爆。
+PROMPT_LIMIT = 80
 
 # 注意：score 是点评快照（0 = 没取到，前台显示成没有分数那一截）。
 SEED: list[dict] = [
@@ -129,3 +136,36 @@ async def ensure_seed(db: AsyncSession) -> int:
         db.add(DateMenuItem(**row, sort=(i + 1) * 10))
     await db.commit()
     return len(SEED)
+
+
+async def prompt_items(db: AsyncSession, limit: int = PROMPT_LIMIT) -> list[DateMenuItem]:
+    """给对话 Context 用的菜单项。
+
+    包含 hidden 项：hidden 只控制 /date 前台是否展示，不改变「这家店存在」的事实；
+    用户提到它时仍然应该能关联上。用 sort 排序，保证同样的输入得到同样的 prompt。
+    """
+    stmt = select(DateMenuItem).order_by(DateMenuItem.sort, DateMenuItem.id).limit(limit)
+    return list((await db.execute(stmt)).scalars().all())
+
+
+def render_prompt(items: list[DateMenuItem], today: date | None = None) -> str:
+    """拼成模型能直接读的「今天 + 可关联餐厅清单」。
+
+    今天日期是给 visited_on 解析相对日期用的（"昨天/上周六"），
+    所以即使没有菜单项也保留第一行。
+    """
+    day = today or today_local()
+    lines = [f"【今天】{day:%Y-%m-%d}"]
+    if not items:
+        lines.append("【约会餐厅清单】（暂无；店名对不上时 restaurant_id 填 null）")
+        return "\n".join(lines)
+
+    lines.append("【约会餐厅清单】（提到的店如果能对上，就用这里的 id 关联；id 不要改写）")
+    for item in items:
+        bits = [item.name]
+        if item.branch:
+            bits.append(f"（{item.branch}）")
+        if item.cuisine:
+            bits.append(f"｜{item.cuisine}")
+        lines.append(f"- id={item.id}  {''.join(bits)}")
+    return "\n".join(lines)

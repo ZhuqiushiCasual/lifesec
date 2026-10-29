@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -69,3 +69,22 @@ class ChooseOut(BaseModel):
     ok: bool
     message_id: str
     text: str
+
+
+class DateVisitOut(BaseModel):
+    """一条探店记录（后台查询用；前台呈现方式待定）。"""
+
+    id: str
+    event_id: Optional[str] = None
+    restaurant_id: Optional[str] = None
+    restaurant_name: str
+    branch: str = ""
+    cuisine: str = ""
+    visited_on: date
+    rating: Optional[float] = None
+    dishes: list[str] = Field(default_factory=list)
+    companion: Optional[str] = None
+    occasion: Optional[str] = None
+    review: str = ""
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

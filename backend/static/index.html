@@ -9,7 +9,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🌿</text></svg>">
   <!-- ?v= 用来把浏览器里可能还"新鲜"的旧缓存整条绕开：
        每次改前端就把版本号 +1（服务端另有 no-cache 兜底，这是双保险） -->
-  <link rel="stylesheet" href="/styles.css?v=3">
+  <link rel="stylesheet" href="/styles.css?v=4">
 </head>
 <body>
   <div class="app">
@@ -52,6 +52,30 @@
     </div>
   </div>
 
+  <!-- 洞察详情：卡面只放总结，点开看完整正文，再出去看原文 -->
+  <div id="insight-modal" class="modal" hidden>
+    <div class="modal-panel">
+      <div class="modal-head">
+        <span class="modal-kicker">外部消息</span>
+        <button id="insight-close" class="drawer-close">关闭</button>
+      </div>
+      <div class="modal-body" id="insight-body">
+        <div id="insight-meta" class="insight-modal-meta"></div>
+        <h2 id="insight-title" class="insight-modal-title"></h2>
+        <div class="insight-section-label">总结</div>
+        <p id="insight-summary" class="insight-modal-summary"></p>
+        <div id="insight-tags"></div>
+        <div id="insight-detail-wrap">
+          <div class="insight-section-label">详情</div>
+          <div id="insight-detail" class="insight-detail"></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <a id="insight-link" class="insight-open" target="_blank" rel="noreferrer">原文链接 ↗</a>
+      </div>
+    </div>
+  </div>
+
   <!-- 画像初始化：10 题 → 可审阅预览 → 确认。建过之后入口按钮就消失 -->
   <div id="onboard" class="drawer" hidden>
     <div class="drawer-panel">
@@ -73,6 +97,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=3"></script>
+  <script src="/app.js?v=4"></script>
 </body>
 </html>

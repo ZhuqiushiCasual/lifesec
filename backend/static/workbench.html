@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FBF7F1">
+<title>selfsec · 消息推送后台</title>
+<link rel="stylesheet" href="/workbench.css?v=1">
+</head>
+<body>
+<!--
+  工作台 —— 消息推送后台（给「后台」那一半人看）
+
+    概览：任务队列 / 源健康 / 近 24h 消息量 / 每日调度配置
+    任务：手动下发、重试、取消、看每个源的执行结果
+    源：五个内置源的启停、编辑、单源试跑、补种
+    消息：前台推送的内容在这里修改 / 隐藏 / 删除 / 合并
+
+  鉴权：X-Workbench-Password（密码只在 sessionStorage 里，关标签页就没了）
+  不要求 API_TOKEN —— 那是 Hermes 的机器凭证，不该出现在浏览器里。
+-->
+
+<header class="top">
+  <div class="brand"><span class="dot"></span><b>selfsec</b><span class="sub">消息推送后台</span></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="overview" class="on">概览</button>
+    <button data-tab="tasks">任务</button>
+    <button data-tab="sources">源</button>
+    <button data-tab="messages">消息</button>
+  </nav>
+  <div class="top-actions">
+    <span id="refresh-at" class="muted"></span>
+    <button id="refresh" class="ghost">刷新</button>
+    <a href="/" class="ghost">回前台</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- 概览 -->
+  <section class="view" id="view-overview">
+    <div class="hero">
+      <h1>消息推送 <em>运行情况</em></h1>
+      <p>采集在 Hermes 上跑，这里看结果、改源、补任务。</p>
+    </div>
+    <div class="stats" id="stat-cards"></div>
+    <div class="panel">
+      <div class="panel-head"><b>调度配置</b><span class="muted">改 config / .env 后重启生效</span></div>
+      <div id="config-box" class="config-box"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><b>最近任务</b><a href="#" data-goto="tasks">全部 →</a></div>
+      <div id="recent-tasks"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><b>最近执行</b><span class="muted">每个源一行</span></div>
+      <div id="recent-runs"></div>
+    </div>
+  </section>
+
+  <!-- 任务 -->
+  <section class="view" id="view-tasks" hidden>
+    <div class="hero">
+      <h1>采集任务</h1>
+      <p>建了任务会推给 Hermes；推不到也没关系 —— 它下一次 pull 会自己领走。</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><b>手动下发</b><span class="muted" id="dispatch-hint"></span></div>
+      <div class="source-picker" id="task-sources"></div>
+      <div class="row-actions">
+        <button class="primary" id="create-task">立即下发</button>
+        <span class="muted">不选 = 全部启用源</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><b>任务列表</b><span class="muted" id="task-count"></span></div>
+      <div id="task-list"></div>
+    </div>
+  </section>
+
+  <!-- 源 -->
+  <section class="view" id="view-sources" hidden>
+    <div class="hero">
+      <h1>采集源</h1>
+      <p>加一个源 = 加一行配置。站点改版先改选择器，长期失效先停用。</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <b>源列表</b>
+        <div class="row-actions">
+          <button class="ghost" id="seed-sources">补回内置源</button>
+          <button class="primary" id="add-source">加一个源</button>
+        </div>
+      </div>
+      <div id="source-list"></div>
+    </div>
+  </section>
+
+  <!-- 消息 -->
+  <section class="view" id="view-messages" hidden>
+    <div class="hero">
+      <h1>推送消息</h1>
+      <p>前台窗口里看到的洞察卡，就是这些。可以改标题 / 摘要 / 详情，也可以合并重复。</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <b>消息列表</b>
+        <div class="row-actions">
+          <select id="msg-source" class="select"><option value="">全部来源</option></select>
+          <label class="check"><input type="checkbox" id="msg-hidden"> 含已隐藏</label>
+          <button class="ghost" id="reload-messages">刷新</button>
+        </div>
+      </div>
+      <div class="merge-bar" id="merge-bar" hidden>
+        已选 <b id="merge-count">0</b> 条 · 第一条作为主消息
+        <button class="primary small" id="merge-go">合并选中</button>
+        <button class="ghost small" id="merge-clear">取消</button>
+      </div>
+      <div id="message-list"></div>
+    </div>
+  </section>
+</main>
+
+<div id="gate" class="gate" hidden>
+  <form class="gate-box" id="gate-form">
+    <div class="gate-dot"></div>
+    <h2>这里是后台</h2>
+    <p>输入工作台密码（WORKBENCH_PASSWORD）。</p>
+    <input id="gate-pwd" type="password" autocomplete="current-password" placeholder="工作台密码" required>
+    <button class="primary" type="submit">进去</button>
+    <div id="gate-msg" class="gate-msg"></div>
+  </form>
+</div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-panel">
+    <div class="modal-head">
+      <b id="modal-title"></b>
+      <button class="ghost" id="modal-close">关闭</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="/workbench.js?v=1"></script>
+</body>
+</html>

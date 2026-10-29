@@ -4,6 +4,7 @@
 
     Block A  画像（Portrait）      全量 · 分 5 节 · ≤1500 字符   稳定（天级）
     Block B  馆藏目录（索引卡）     一行一个标签，只有指针不展开    稳定（天级）
+    Block B1 约会餐厅（菜单）       可关联的店 + 今天日期          稳定（改菜单时变）
     —— 统计 / 洞察 ——              半稳定（天 / 周级）
     Block C  近 N 轮用户提问        只取我说的 + 时间锚 + 主题      只追加（轮级）
     Block D  命中档                 命中标签的摘要 + 最近几条原文    **每轮都变**
@@ -22,8 +23,10 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.date_menu import DateMenuItem
 from app.models.event import Event
 from app.models.user import User
+from app.services import date_menu as date_menu_service
 from app.services import records
 from app.services.memory import insights, library, profile, session, stats
 
@@ -44,6 +47,7 @@ class Context:
     memory_block: str
     history: list[dict] = field(default_factory=list)
     candidates: list[Event] = field(default_factory=list)   # 今天已有的事件（合并候选）
+    restaurants: list[DateMenuItem] = field(default_factory=list)  # 本轮可关联的约会餐厅
     user: str = ""
     profile: str = ""
     stats: dict = field(default_factory=dict)
@@ -60,6 +64,7 @@ async def build(db: AsyncSession, user: User, content: str, *, hint: str = "") -
     """一次组装 = 若干次本地查询。没有任何额外的模型调用。"""
     profile_text = await profile.text(db, user.id)                  # Block A
     card = await library.card_rows(db, user.id)                     # Block B
+    restaurants = await date_menu_service.prompt_items(db)          # Block B1
     stat_data = await stats.collect(db, user.id)
     insight_items = await insights.recent(db, user.id)
     turns = await session.user_turns(db, user.id)                   # Block C
@@ -78,6 +83,11 @@ async def build(db: AsyncSession, user: User, content: str, *, hint: str = "") -
     card_text = library.render_card(card)
     if card_text:
         blocks["B_馆藏目录"] = card_text
+
+    # 约会餐厅：店名稳定，改菜单才会变；今天日期给 visited_on 解析相对日期用
+    date_text = date_menu_service.render_prompt(restaurants)
+    if date_text:
+        blocks["B1_约会餐厅"] = date_text
 
     # 统计与洞察：半稳定，放在目录之后、会话之前
     stat_text = stats.render(stat_data)
@@ -103,6 +113,7 @@ async def build(db: AsyncSession, user: User, content: str, *, hint: str = "") -
         memory_block="\n\n".join(blocks.values()),
         history=await session.as_history(db, user.id),
         candidates=candidates,
+        restaurants=restaurants,
         user=content,
         profile=profile_text,
         stats=stat_data,
