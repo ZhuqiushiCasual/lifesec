@@ -1340,7 +1340,10 @@ on('#plan-body', 'click', (e) => {
   }
   const toggle = e.target.closest('[data-option-toggle]');
   if (toggle) {
-    const rest = toggle.closest('.plan-group')?.querySelector('.option-rest');
+    // tab 改版后按钮的父容器是 #plan-options，不再有 .plan-group 包裹
+    const rest =
+      toggle.parentElement?.querySelector('.option-rest') ||
+      toggle.closest('#plan-options')?.querySelector('.option-rest');
     if (!rest) return;
     rest.hidden = !rest.hidden;
     toggle.textContent = rest.hidden ? `展开全部 ${toggle.dataset.optionCount} 个` : '收起';
