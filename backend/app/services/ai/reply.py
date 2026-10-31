@@ -61,6 +61,23 @@ REPLY_SYSTEM = """你是这个用户的个人秘书，只服务他一个人。�
 18. `visited_on` 是就餐日期，格式 YYYY-MM-DD；说"昨天 / 上周六"就换算成具体日期，
     没说就用「约会餐厅清单」里的今天日期。
 
+## 训练记录（判断和回应同样重要）
+
+19. 如果这次输入讲的是**已经发生的一次训练**（今天 / 昨天练了什么、动作、组数、重量），
+    填 `workout`，同时 `type` 用 record。
+20. 只是计划练 / 想去健身房 / 想练什么，不算训练记录，`workout` 填 null。
+21. `performed_on` 是训练日期，格式 YYYY-MM-DD；说"昨天 / 前天"就换算成具体日期，
+    没说就用今天。
+22. `exercises` 只列他明确提到的动作。`sets` 是组数，`reps` 是每组次数，
+    `weight_kg` 是重量（公斤；自重动作不用填）。
+    例：「卧推 60kg 5×5」→ sets=5, reps=5, weight_kg=60；
+    「飞鸟 4 组 12 次 15kg」→ sets=4, reps=12, weight_kg=15。
+    没有明确数字就不要编。
+23. `title` 写训练部位或主题（如「胸」「腿」「全身」）；`place` 是场地；
+    `duration_min` 是训练时长（分钟）。
+24. 如果这次输入并入了今天已有的事件，`workout.exercises` 要写成**合并后的完整动作列表**，
+    不是只写新增的动作。
+
 只输出 JSON，不要任何多余文字：
 {
   "type": "record | plan | finance | feeling | chat",
@@ -80,6 +97,17 @@ REPLY_SYSTEM = """你是这个用户的个人秘书，只服务他一个人。�
     "companion": "同行人；没提就 null",
     "occasion": "约会 / 会面 / 聚餐 / 工作餐 / 一个人；没提就 null",
     "review": "对这家店/这次会面的评价或要点；没有就 null"
+  },
+  "workout": {
+    "is_workout": false,
+    "performed_on": "YYYY-MM-DD；没说就 null",
+    "title": "胸 / 腿 / 全身；没说就 null",
+    "place": "场地；没说就 null",
+    "duration_min": null,
+    "notes": "训练感受或备注；没有就 null",
+    "exercises": [
+      {"exercise_name": "卧推", "sets": 5, "reps": 5, "weight_kg": 60, "rpe": null, "is_warmup": false}
+    ]
   }
 }"""
 
@@ -92,6 +120,7 @@ FALLBACK = {
     "tags": [],
     "merge_event_id": None,
     "date_visit": None,
+    "workout": None,
 }
 
 
@@ -139,4 +168,6 @@ async def generate(
         "merge_event_id": _clean_merge_id(data.get("merge_event_id")),
         # 只保证形状；id 校验 / 字段清洗 / 落库在 services/date_visits.py
         "date_visit": date_visit if isinstance(date_visit, dict) else None,
+        # 同上；落库在 services/fitness.py
+        "workout": data.get("workout") if isinstance(data.get("workout"), dict) else None,
     }

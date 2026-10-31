@@ -1,5 +1,6 @@
-# 构建镜像时排除：secrets 与本地数据不进镜像，配置统一由 compose 注入
+# 构建上下文是 backend/；不要把密钥和本地库打进镜像
 .env
+.env.*
 *.db
 *.sqlite3
 __pycache__/
@@ -7,3 +8,4 @@ __pycache__/
 venv/
 .venv/
 smoke_test.py
+.pytest_cache/

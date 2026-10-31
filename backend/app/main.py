@@ -25,14 +25,16 @@ if not _selfsec_logger.handlers:
     _selfsec_logger.propagate = False  # 避免重复输出
 
 import app.models  # noqa: F401 —— 注册全部模型，create_all 才能看到
-from app.api import chat, date, ingest, insights, memory, messages, onboarding, plans, workbench
+from app.api import chat, date, ingest, insights, life, memory, messages, onboarding, plans, workbench
 from app.database import Base, async_session, engine
-from app.services import scheduler
+from app.services import fitness, outing, scheduler
 from app.services.date_menu import ensure_seed
 from app.services.deps import ensure_default_user, verify_token
 from app.services.ingest.sources import ensure_seed as ensure_ingest_sources
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+MEDIA_DIR = Path(__file__).resolve().parent.parent / "media"
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -44,6 +46,8 @@ async def lifespan(app: FastAPI):
     # 采集源种子：只补缺失的 key，不覆盖工作台里改过的配置
     async with async_session() as db:
         await ensure_seed(db)
+        await fitness.ensure_seed(db)
+        await outing.ensure_seed(db)
         await ensure_ingest_sources(db)
     task = scheduler.start()
     try:
@@ -62,6 +66,7 @@ api_router.include_router(chat.router)
 api_router.include_router(messages.router)
 api_router.include_router(insights.router)
 api_router.include_router(plans.router)
+api_router.include_router(life.router)
 api_router.include_router(memory.router)
 api_router.include_router(onboarding.router)
 api_router.include_router(ingest.router)     # Hermes 执行面（API_TOKEN）
@@ -92,6 +97,9 @@ async def workbench_page():
 async def health():
     return {"status": "ok"}
 
+
+# 动作演示媒体：本地目录，不随仓库分发；没有文件时训练详情只显示文字
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 # 前端：唯一一个聊天窗口。挂载在最后，/api/* 与 /health 优先匹配
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

@@ -105,6 +105,16 @@ Hermes     生成 + 迭代时钟        当前 User Message     4.3 迭代三时
   同时关联 `date_menu.id` 和当天的 `event`。店名对不上菜单时 `restaurant_id` 为空、保留店名快照。
   同人 + 同店 + 同日期只保留一条，后续补充更新它。前台怎么呈现待定，先用
   `GET /api/date/admin/visits` 核对
+- **训练日志**（`services/fitness.py`）：聊天里「已经发生的训练」由同一轮生成判定（`workout.is_workout`）；
+  动作名按 `exercises` 库 / 别名匹配，匹配不到保留快照；同一天同一事件只保留一条 `workouts`，
+  补充时整体重建 `workout_sets`（动作顺序 + 组序号）。一次训练关联当天的 `event`，
+  回看投影成 `domain=workout` 的站点。动作库种子 54 个；演示媒体放 `backend/media/`（gitignore），
+  用 `scripts/fetch_exercise_media.py` 或 `python -m app.services.fitness_media --source <目录|zip>` 本地导入，
+  缺失时降级为文字。**安排页候选和执行视图都直接展示动作 GIF**，不要只放在回看里。
+  安排页所有项目都可点开详情：计划卡 → 执行视图，训练动作 → 动作详情（可加入本次训练 / 单独安排），
+  美食 / 出门 → 餐厅 / 地点详情；卡片内的「选 / 安排」按钮不触发详情。
+- **安排候选**（`services/outing.py`、`/api/life/options`）：安排页除已定计划外，还展示三组候选——
+  训练动作（exercises）/ 美食（date_menu）/ 出门玩（outing_spots 种子）。候选只读，选日期生成计划在 V3.4。
 - **内置调度**（`services/scheduler.py`）：一个 asyncio 循环，早晚各一次问候 + 00:00 每日兜底
   （兜底走 `lifecycle.daily`：距上次迭代 > `PORTRAIT_HOURS` 且确有新增才补跑，不是无条件重写）
   + 每日采集（默认 07:10，`INGEST_HOUR` / `INGEST_MINUTE`）。
@@ -135,6 +145,19 @@ Hermes     生成 + 迭代时钟        当前 User Message     4.3 迭代三时
 | — | `/api/workbench/*` | 工作台：概览 / 源增删改启停 / 任务下发重试取消 / 消息管理；需 `X-Workbench-Password` |
 | GET | `/workbench` | 采集工作台页面（静态 `static/workbench.html`） |
 | GET | `/api/plans` | 待办列表（默认只返回 open） |
+| GET | `/api/life/timeline` | 生活档案回看：事件 / 探店 / 洞察按天倒序（`from` / `to` / `domain` / `q` / `place`） |
+| GET | `/api/life/places` | 地点聚合：去过几次、上次哪天、评分与最近评价 |
+| GET | `/api/life/experiences/{kind}/{id}` | 站点详情：原话 + 摘要 + 探店 / 训练字段 |
+| GET | `/api/life/search?q=` | 跨事件 / 洞察 / 探店 / 动作名 / 计划搜索 |
+| GET | `/api/life/options?kind=workout\|food\|outing` | 安排页候选池（动作 / 餐厅 / 出门地点） |
+| GET | `/api/life/exercises` | 动作库（可按部位 / 器械筛选） |
+| GET | `/api/life/workouts/{id}` | 训练详情：动作 + 组明细 + 总容量 |
+| GET | `/api/life/workouts/last?exercise=` | 上次某动作 |
+| GET | `/api/life/workouts/stats?exercise=&from=&to=` | 训练统计 |
+| GET | `/api/life/plans?status=open\|done\|all` | 计划列表（按 scheduled_on 排序） |
+| GET | `/api/life/plans/{id}` | 计划执行视图：训练动作（含媒体）/ 餐厅 / 出门地点 |
+| POST | `/api/life/plans` | 从候选 / 经历创建计划（kind / scheduled_on / ref / meta） |
+| PATCH | `/api/life/plans/{id}` | 改期 / 改标题 / 勾选 |
 | PATCH | `/api/plans/{id}` | 勾选待办（`{"status": "open\|done"}`） |
 | GET | `/api/memory` | 画像：分节正文 + 每节 provenance + 变更摘要 |
 | POST | `/api/memory/refresh` | 手动强制重算画像（force，不推 nudge） |
@@ -160,7 +183,7 @@ Hermes     生成 + 迭代时钟        当前 User Message     4.3 迭代三时
 | `/api/date/menu`、`/api/date/choose` | 公开 | 给另一半看的页面，不能要求 token |
 | `/api/date/admin/*`、`/api/date/items`、`/api/date/reorder` | `X-Date-Password`（`DATE_ADMIN_PASSWORD`） | 只保护增删改排序与探店查询 |
 
-## 数据模型（13 张表 + 用户锚点）
+## 数据模型（17 张表 + 用户锚点）
 
 ```
 users           单用户，仅作外键锚点，启动时自动创建
@@ -174,7 +197,9 @@ events          合并后的事件  ← source=user(同一天合并的结果) / 
                 tags(JSON) AI 每次生成的标签；occurred_on 归属日期（同一天才合并）
                 recorded_at 第一次记到它 / last_at 最近一次补充 / merged_count 合并了几条消息
                 dedup_key 供 Hermes 幂等
-plans           待办 / 目标，从对话里长出来，可勾选
+plans           待办 / 目标 / 计划，从对话或安排候选长出来，可勾选
+                title / status / due_date(旧) / scheduled_on / kind(todo|goal|meal|outing|travel|workout)
+                place / ref_type+ref_id（date_menu / outing_spot / workout / event）/ meta(JSON) / source
 memory_profile  画像，单用户单行：sections(JSON 分 5 节) + sources(JSON 每节 provenance)
                 + summary(最近变更摘要) + version / event_count(依据事件数) / msg_count(依据轮数)
                 content 是分节渲染后的全文（给人看 / 兜底）
@@ -190,6 +215,14 @@ date_visits     约会探店记录：一次已经发生的吃饭 / 会面
                 event_id → 当天的合并事件；visited_on 就餐日期
                 rating(1–5, 可为 4.5) / dishes(JSON) / companion / occasion / review
                 同人 + 同店 + 同日期只保留一条，后续补充更新它
+exercises       动作库：中文名 / 英文名 / 部位 / 器械 / 目标肌群 / 别名 / 本地媒体路径
+                种子 54 个常见动作；按胸→背→腿→臀→肩→手臂→核心→全身排序
+workouts        一次训练：event_id / performed_on / place / duration_min / title
+                同一天同一事件只保留一条，补充时更新它
+workout_sets    组明细：exercise_id / exercise_name 快照 / exercise_order / set_index
+                weight_kg / reps / duration_sec / rpe / is_warmup
+outing_spots    出门玩候选：name / kind(景点/展馆/公园/街区/活动) / area / note
+                tags(JSON) / sort / hidden；种子 12 个杭州地点，只读候选
 ingest_sources  采集源配置：key / name / feed_url / kind(rss|json_api|html|github)
                 / level / category / enabled / priority / max_items / config(JSON)
                 加源 = 加一行配置，不在代码里写站点逻辑；种子只补缺失 key
@@ -267,6 +300,8 @@ MySQL 的 `DATETIME` 默认精度只到「秒」，同一秒内落库的多条�
      跑 `python migrate_v2.py`（幂等，SQLite / MySQL 都能跑；**在容器里跑**见 `docs/部署.md` 第十二节）
    - v2 → v3（画像分节 + `tag_index` / `tag_aliases` / `job_runs` / `profile_versions`）：
      跑 `python migrate_v3.py`（幂等；新表走 `create_all`，老库的一整段画像会搬进 `sections.insight` 不丢）
+   - v3 → v4（`plans` 扩展 + 训练 / 出门玩新表）：跑 `python migrate_v4.py`（幂等；
+     新表走 `create_all`，`plans` 的列用 `ADD COLUMN`）
    - 时间戳精度升级（`DATETIME` → `DATETIME(6)`）要跑 `docs/alter-datetime6.sql`
 2. **`backend/.env` 里现在指向的是旧的远程库**，且是旧表结构 —— 用之前先确认/更换 `DATABASE_URL`
 3. **无测试框架**，只有 `smoke_test.py`（161 项断言，端到端，离线可跑；含采集链路 [18]–[22] 与探店 [23]）
@@ -294,3 +329,9 @@ MySQL 的 `DATETIME` 默认精度只到「秒」，同一秒内落库的多条�
     补触发；如果那个小时服务整体没起来，当天不会补建任务（需要手动在工作台「立即下发」）
 14. **探店记录的识别质量取决于模型**：`is_visit` 由模型判定；模型不可用时不建探店记录（事件照记）。
     菜单里没有的店只保留店名快照，不会自动加进 `/date` 菜单
+15. **训练抽取同样取决于模型**：同一句训练输入偶尔会漏抽（模型波动）；代码只做动作匹配、
+    数字校验与组数展开，不硬编码「练了 / 卧推」判定。漏抽时事件照记，可再补一句。
+16. **动作演示媒体不随仓库分发**：`backend/media/` 已 gitignore；用
+    `python scripts/fetch_exercise_media.py`（从 exercises-dataset 拉取匹配项）或
+    `python -m app.services.fitness_media --source <目录|zip>` 本地导入；当前已导入 45/54，
+    缺失时训练详情降级为文字

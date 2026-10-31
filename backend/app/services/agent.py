@@ -22,7 +22,7 @@ from app.models.event import TYPE_FEELING, TYPE_FINANCE, TYPE_PLAN, TYPE_RECORD,
 from app.models.message import KIND_REPLY, KIND_USER, ROLE_ME, ROLE_SECRETARY, Message
 from app.models.plan import Plan
 from app.models.user import User
-from app.services import date_visits, records
+from app.services import date_visits, fitness, records
 from app.services.ai import reply as ai_reply
 from app.services.memory import context as ctx_builder
 from app.services.memory import library as mem_library
@@ -52,9 +52,31 @@ def route(content: str) -> tuple[str, str]:
     return "record", ""
 
 
-def _build_card(etype: str, event: Event, plan: Plan | None, merged: bool) -> dict | None:
+def _build_card(
+    etype: str,
+    event: Event,
+    plan: Plan | None,
+    merged: bool,
+    workout=None,
+    workout_lines: list[str] | None = None,
+) -> dict | None:
     """卡片是窗口里唯一的结构化输出——它把「并到哪儿了、贴了什么标签」露出来。"""
     tags = event.tags or []
+
+    if workout is not None:
+        return {
+            "kind": "workout",
+            "title": workout.title or "训练",
+            "lines": list(workout_lines or []),
+            "meta": {
+                "event_id": event.id,
+                "workout_id": workout.id,
+                "tags": tags,
+                "place": workout.place,
+                "duration_min": workout.duration_min,
+                "merged": merged,
+            },
+        }
 
     if plan is not None:
         return {
@@ -125,15 +147,27 @@ async def handle(db: AsyncSession, user: User, content: str) -> dict:
         restaurants=ctx.restaurants,
     )
 
+    # 4a2. 如果这句话是在讲一次已经发生的训练，落 workouts / workout_sets。
+    #      判定同样来自这次生成（workout.is_workout），这里只校验、匹配动作、展开组数。
+    workout, workout_lines = await fitness.apply(
+        db, user, event, data.get("workout"), content=content
+    )
+
     # 4b. 命中待办则生成 plan
     plan = None
     if etype == TYPE_PLAN and data.get("title"):
-        plan = Plan(user_id=user.id, title=str(data["title"])[:255], ref_event_id=event.id)
+        plan = Plan(
+            user_id=user.id,
+            title=str(data["title"])[:255],
+            ref_event_id=event.id,
+            kind="todo",
+            source="chat",
+        )
         db.add(plan)
         await db.flush()
 
     # 5. 它的回应：挂在同一条事件上，卡片带标签与合并信息
-    card = _build_card(etype, event, plan, merged)
+    card = _build_card(etype, event, plan, merged, workout, workout_lines)
     if card is not None and visit is not None:
         # 只放进 meta，不改变卡面文案：前台怎么呈现探店记录还没定
         card["meta"]["date_visit"] = {
@@ -170,4 +204,5 @@ async def handle(db: AsyncSession, user: User, content: str) -> dict:
         "merged": merged,
         "date_visit_id": visit.id if visit is not None else None,
         "restaurant_id": visit.restaurant_id if visit is not None else None,
+        "workout_id": workout.id if workout is not None else None,
     }

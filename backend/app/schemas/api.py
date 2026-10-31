@@ -29,6 +29,7 @@ class ChatResponse(BaseModel):
     merged: bool = False              # 是并入了今天已有的事件，还是新建了一条
     date_visit_id: Optional[str] = None   # 命中探店时，落下的 date_visits 记录
     restaurant_id: Optional[str] = None   # 关联到的约会菜单项（对不上菜单时为空）
+    workout_id: Optional[str] = None      # 命中训练时，落下的 workouts 记录
 
 
 # ── POST /api/insights（Hermes 回调）──────────────────────
@@ -70,10 +71,35 @@ class PlanOut(BaseModel):
     title: str
     status: str
     due_date: Optional[date] = None
+    scheduled_on: Optional[date] = None
+    kind: str = "todo"
+    place: str = ""
+    ref_type: Optional[str] = None
+    ref_id: Optional[str] = None
+    meta: Optional[dict] = None
+    source: str = "chat"
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class PlanCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    kind: str = Field("todo", pattern="^(todo|goal|meal|outing|travel|workout)$")
+    scheduled_on: Optional[date] = None
+    place: str = Field("", max_length=120)
+    ref_type: Optional[str] = Field(None, max_length=16)
+    ref_id: Optional[str] = Field(None, max_length=36)
+    meta: dict[str, Any] = Field(default_factory=dict)
+    source: str = Field("recall", pattern="^(chat|recall|manual)$")
+
+
+class PlanLifePatch(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    status: Optional[str] = Field(None, pattern="^(open|done)$")
+    scheduled_on: Optional[date] = None
+    place: Optional[str] = Field(None, max_length=120)
 
 
 class PlanPatch(BaseModel):
