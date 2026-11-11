@@ -164,10 +164,16 @@
     width:100%;max-width:520px;background:var(--card);border-radius:22px 22px 0 0;
     max-height:92vh;display:flex;flex-direction:column;overflow-y:auto;
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
-    transform:translateY(16px);transition:transform .24s cubic-bezier(.2,.8,.3,1);
+    transform:translateY(16px);
+    transition:transform .26s cubic-bezier(.2,.8,.3,1), opacity .2s ease;
     box-shadow:var(--shadow-l);
   }
   .modal.show .panel{transform:none}
+  /* 关闭：整体缩回去（✕ / 下滑 / 返回键 都走这里），跟点开时是反着的动作 */
+  .modal.show.closing{opacity:0}
+  .modal.show.closing .panel{transform:scale(.9) translateY(26px);opacity:0}
+  /* 手指拖拽中不要 transition，否则跟手会抖 */
+  .panel.dragging{transition:none!important}
   @media(min-width:820px){
     .modal{align-items:center;padding:24px}
     .panel{
@@ -726,16 +732,34 @@ function openSheet(id){
   openId = id; galIdx = 0;
   renderGallery(item);
   renderDetail(item);
-  $('#modal').classList.add('show');
+  const m = $('#modal');
+  m.classList.remove('closing');
+  m.classList.add('show');
   document.body.style.overflow = 'hidden';
-  if (history.replaceState) history.replaceState(null, '', '#r=' + encodeURIComponent(id));
+  // 每开一次压一条历史：手机返回键 / 边缘右滑返回 = 缩回去，而不是直接离开页面
+  try{ history.pushState({ sheet: id }, '', '#r=' + encodeURIComponent(id)); }catch(e){}
 }
+
+/* 所有关闭入口（✕ / 下滑 / 返回键 / 选完）都汇到这里，先播"缩小"再摘 show */
 function closeSheet(){
-  $('#modal').classList.remove('show');
-  document.body.style.overflow = '';
-  openId = null;
-  if (location.hash.startsWith('#r=')) history.replaceState(null, '', location.pathname + location.search);
+  const m = $('#modal');
+  if (!m.classList.contains('show') || m.classList.contains('closing')) return;
+  // 自己压的历史自己退：让 popstate 走同一条收尾路径，历史里不会堆一串 #r=
+  if (history.state && history.state.sheet){ history.back(); return; }
+  doClose();
 }
+function doClose(){
+  const m = $('#modal');
+  if (!m.classList.contains('show') || m.classList.contains('closing')) return;
+  m.classList.add('closing');
+  setTimeout(() => {
+    m.classList.remove('show', 'closing');
+    document.body.style.overflow = '';
+    openId = null;
+    if (location.hash.startsWith('#r=')) history.replaceState(null, '', location.pathname + location.search);
+  }, 240);
+}
+window.addEventListener('popstate', () => { if ($('#modal').classList.contains('show')) doClose(); });
 
 function renderGallery(r){
   const ps = photosOf(r);
@@ -826,6 +850,42 @@ function renderDetail(r){
   $('#galClose').addEventListener('click', closeSheet);
   $('#footClose').addEventListener('click', closeSheet);
   $('#modal').addEventListener('click', e => { if (e.target === $('#modal')) closeSheet(); });
+})();
+
+/* 下滑关闭：浮层滚到顶时往下拖，跟着手指缩；过 110px 松手就缩回去，不够就弹回原位。
+   只在 scrollTop 为 0 时接管 —— 否则往下滑是正常看详情。 */
+(function(){
+  const panel = document.querySelector('.panel');
+  let startY = 0, dy = null, armed = false;
+  panel.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1){ armed = false; return; }
+    startY = e.touches[0].clientY;
+    dy = null;
+    armed = panel.scrollTop <= 0;
+  }, { passive: true });
+  panel.addEventListener('touchmove', e => {
+    if (!armed || e.touches.length !== 1) return;
+    const d = e.touches[0].clientY - startY;
+    if (dy === null){
+      if (d < 8) return;                    // 往上 / 没动：交给正常滚动
+      panel.classList.add('dragging');
+      dy = 0;
+    }
+    dy = d;
+    panel.style.transform = `translateY(${d}px) scale(${Math.max(.9, 1 - d / 2600)})`;
+    panel.style.opacity = String(Math.max(.4, 1 - d / 700));
+  }, { passive: true });
+  const endDrag = () => {
+    if (dy === null) return;
+    const d = dy;
+    dy = null; armed = false;
+    panel.classList.remove('dragging');
+    panel.style.transform = '';
+    panel.style.opacity = '';
+    if (d > 110) closeSheet();
+  };
+  panel.addEventListener('touchend', endDrag, { passive: true });
+  panel.addEventListener('touchcancel', endDrag, { passive: true });
 })();
 
 /* ============================ 拉数据 ============================ */
