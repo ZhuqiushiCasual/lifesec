@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FBF7F1">
+<title>候选清单 · 备选餐厅</title>
+<!--
+  /date/candidates —— 候选餐厅复核页（只读，数据来自 static/date_candidates.json）
+
+  为什么是一张静态页而不是又建一张表：
+  这批东西是「抓回来待人工复核」的原料，还没进菜单；复核完的才值得进 date_menu。
+  页面只负责把「店名 / 在哪 / 大概人均 / 为什么像你的口味 / 原始笔记链接」摆在一起，
+  点卡片直接开小红书原文，一个个人肉过一遍。
+
+  数据由 scripts/xhs_photos/discover.py 抓、主 agent 抽取后写进 date_candidates.json。
+-->
+<style>
+  :root{
+    --paper:#FBF7F1; --card:#FFFFFF;
+    --ink:#3A3129; --ink2:#6E6055; --ink3:#A79684;
+    --line:#F0E6DA; --line2:#F8F2E9;
+    --warm:#E8845A; --warm-d:#C96A42; --amber:#F2B872;
+    --shadow-s:0 1px 2px rgba(120,90,60,.05), 0 4px 12px rgba(120,90,60,.05);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;color:var(--ink);font-size:15px;line-height:1.68;
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",sans-serif;
+    background:
+      radial-gradient(560px 320px at 90% -8%, #FFF3E4 0%, rgba(255,243,228,0) 62%),
+      radial-gradient(520px 300px at 2% 4%, #FDF6EC 0%, rgba(253,246,236,0) 58%),
+      var(--paper);
+    background-attachment:fixed;-webkit-font-smoothing:antialiased;
+    padding-bottom:calc(36px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:0 14px}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 2px 4px}
+  .brand{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:var(--ink2)}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--warm),var(--amber));
+    box-shadow:0 0 0 4px rgba(232,132,90,.12)}
+  .back{font-size:12.5px;color:var(--ink3);text-decoration:none;border:1px solid var(--line);
+    border-radius:999px;padding:5px 11px;background:#fff}
+  header.hero{padding:8px 2px 14px}
+  header.hero h1{margin:0 0 6px;font-size:24px;font-weight:800;letter-spacing:-.5px}
+  header.hero p{margin:0;font-size:13px;color:var(--ink2)}
+  .note{font-size:11.5px;color:var(--ink3);background:#fff;border:1px dashed var(--line);
+    border-radius:10px;padding:8px 11px;margin:10px 0 0;line-height:1.6}
+  .kws{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 4px}
+  .kw{font-size:12px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 11px;color:var(--ink2)}
+  .kw b{font-weight:800;color:var(--warm-d);margin-right:4px}
+  h2.sec{margin:26px 2px 4px;font-size:16px;font-weight:800;letter-spacing:-.2px}
+  h2.sec span{font-size:12px;font-weight:600;color:var(--warm-d);margin-left:7px}
+  .why{margin:0 2px 10px;font-size:12px;color:var(--ink3);line-height:1.6}
+  .item{
+    display:flex;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:10px;margin:0 0 10px;box-shadow:var(--shadow-s);text-decoration:none;color:inherit;
+    transition:transform .16s ease;
+  }
+  .item:active{transform:scale(.99)}
+  .thumb{flex:0 0 78px;width:78px;height:78px;border-radius:10px;overflow:hidden;background:#F3EBE2}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .info{flex:1;min-width:0}
+  .info .n{font-size:15px;font-weight:800;line-height:1.35;letter-spacing:-.2px}
+  .info .m{font-size:12px;color:var(--ink2);margin-top:2px}
+  .info .r{font-size:12px;color:var(--ink3);margin-top:5px;line-height:1.55;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .info .l{font-size:11px;color:var(--warm-d);margin-top:6px;font-weight:700}
+  .info .l span{color:var(--ink3);font-weight:600;margin-left:6px}
+  .empty{padding:40px 12px;text-align:center;color:var(--ink3);font-size:13px}
+  .foot{margin:22px 2px 0;font-size:11px;color:var(--ink3);line-height:1.75}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><span class="dot"></span>候选清单</div>
+    <a class="back" href="/date">回到菜单</a>
+  </div>
+
+  <header class="hero">
+    <h1 id="title">按你的口味找的</h1>
+    <p id="sub">正在读取…</p>
+    <div class="note" id="note"></div>
+  </header>
+
+  <div class="kws" id="kws"></div>
+  <div id="list"></div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function itemHTML(it){
+  const thumb = it.cover
+    ? `<img src="${esc(it.cover)}" alt="" loading="lazy">`
+    : `<div style="display:grid;place-items:center;height:100%;color:#C9B8A6;font-size:11px">无图</div>`;
+  const meta = [it.area, it.cuisine].filter(Boolean).join(' · ');
+  const price = it.price ? ` · 约 ¥${it.price}` : '';
+  return `<a class="item" href="${esc(it.note_url)}" target="_blank" rel="noopener">
+    <div class="thumb">${thumb}</div>
+    <div class="info">
+      <div class="n">${esc(it.name)}</div>
+      <div class="m">${esc(meta)}${price}</div>
+      ${it.reason ? `<div class="r">${esc(it.reason)}</div>` : ''}
+      <div class="l">看小红书原文 →${it.likes ? `<span>${esc(it.likes)} 赞</span>` : ''}${it.note_title ? `<span>${esc(it.note_title.slice(0,18))}</span>` : ''}</div>
+    </div>
+  </a>`;
+}
+
+async function main(){
+  let data;
+  try{
+    const r = await fetch('/date_candidates.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    data = await r.json();
+  }catch(e){
+    $('#sub').textContent = '候选清单还没生成';
+    console.error(e); return;
+  }
+  const total = (data.groups || []).reduce((n, g) => n + (g.items || []).length, 0);
+  $('#sub').textContent = `${total} 家待复核 · 来自 ${data.stats?.queries || '?'} 组搜索词、${data.stats?.notes || '?'} 篇笔记`;
+  $('#note').textContent = data.note || '';
+  $('#kws').innerHTML = (data.keywords || []).map(k => `<span class="kw"><b>${esc(k.k)}</b>${esc(k.v)}</span>`).join('');
+  $('#list').innerHTML = (data.groups || []).map(g => `
+    <h2 class="sec">${esc(g.title)}${g.count ? `<span>${g.count}</span>` : ''}</h2>
+    ${g.why ? `<p class="why">${esc(g.why)}</p>` : ''}
+    ${(g.items || []).map(itemHTML).join('') || '<div class="empty">这组没抓到</div>'}
+  `).join('') || '<div class="empty">还没有候选</div>';
+  $('#foot').innerHTML = data.foot || '';
+}
+main();
+</script>
+</body>
+</html>

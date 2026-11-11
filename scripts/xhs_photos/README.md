@@ -30,3 +30,19 @@ python -m venv <venv>
   `import_photos.py` 的规则是：标题带店名的够 3 张，就把不带的丢掉。
 - 图不入仓库（`backend/static/date_photos/` 已 gitignore），线上靠 scp 传；
   数据库里只存路径 + 宽高 + 来源笔记链接。
+
+## 另一条流水线：按口味找「还没进菜单的店」
+
+`/date/candidates` 那张复核页的数据来自这条：
+
+1. `python discover.py 4`
+   17 组「从现有菜单抽出来的关键词」（粤式清淡 / 江浙杭帮 / 有氛围的西餐 / 日料 + 商圈），
+   每组收 20–30 张卡片，再点开前 4 篇拿正文 → `discover/raw.json`（可断点续跑）。
+2. `python probe_candidates.py`
+   从标题里挑出的品牌名逐个再搜一遍，点开第一篇拿正文 / 首图 / 点赞 → `cand/<brand>.json|jpg`。
+3. `python build_candidates.py`
+   `CURATED` 里逐条写死「留下谁、区域、菜系、人均、复核提示」以及 `DROPPED`（为什么不要），
+   压缩封面到 400px，产出 `backend/static/date_candidates.json` + `backend/static/date_photos/cand/`。
+
+**取舍必须留在 `DROPPED` 里**：超预算（如院 / 香楼 / 笑颜 / 朴竺）、明显踩雷（O'eat）、
+品牌对不上（KIN）、根本不是餐厅（Moment·盈）—— 写清楚原因，下次重抓才不会又捞回来。

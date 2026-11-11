@@ -40,3 +40,5 @@ backend/static/date_photos/
 # ── 小红书抓图脚本的登录态与中间产物 ──────────
 scripts/xhs_photos/profile/
 scripts/xhs_photos/out/
+scripts/xhs_photos/cand/
+scripts/xhs_photos/discover/

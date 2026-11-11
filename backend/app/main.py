@@ -92,6 +92,12 @@ async def date_page():
     return FileResponse(STATIC_DIR / "date.html")
 
 
+@app.get("/date/candidates", include_in_schema=False)
+async def date_candidates_page():
+    """候选餐厅复核页：抓回来待人工过一遍的备选，数据在 static/date_candidates.json。"""
+    return FileResponse(STATIC_DIR / "date_candidates.html")
+
+
 @app.get("/workbench", include_in_schema=False)
 async def workbench_page():
     """消息推送后台：源配置 / 任务下发 / 执行情况。"""
@@ -121,6 +127,7 @@ async def static_revalidate(request, call_next):
     """
     response = await call_next(request)
     path = request.url.path
-    if path in ("/", "/index.html", "/date", "/workbench") or path.endswith((".js", ".css", ".html")):
+    if path in ("/", "/index.html", "/date", "/workbench", "/date/candidates",
+                "/date_candidates.json") or path.endswith((".js", ".css", ".html")):
         response.headers["Cache-Control"] = "no-cache"
     return response

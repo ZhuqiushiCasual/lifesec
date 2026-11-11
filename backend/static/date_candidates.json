@@ -1,0 +1,291 @@
+{
+ "generated": "2026-11-12",
+ "note": "这批是从小红书按你的口味搜回来的备选，还没进菜单。每家都挂了原始笔记链接，点开能看原文再决定；觉得可以喊我一声，我按标准字段（人均 / 两个距离 / 地铁 / 点菜小抄）补进菜单。",
+ "stats": {
+  "queries": 17,
+  "notes": 399,
+  "candidates": 17
+ },
+ "keywords": [
+  {
+   "k": "口味",
+   "v": "清 4 分以上（9/18 家）、辣度 1（10/18）→ 清汤、少辣、少油"
+  },
+  {
+   "k": "菜系",
+   "v": "粤式清淡（顺德 / 打边炉 / 粥底 / 猪肚鸡 / 潮汕牛）· 江浙杭帮 · 有氛围的西餐 · 日料"
+  },
+  {
+   "k": "预算",
+   "v": "现有 83–142，中位 114；目标带 90–140，硬上限 150"
+  },
+  {
+   "k": "场景",
+   "v": "两人、能坐下说话、桌距宽 / 有隔断 / 卡座、灯光好、出片"
+  },
+  {
+   "k": "位置",
+   "v": "商场或地铁上盖（湖滨 in77 / 嘉里 / 万象城 / 德信 / 西溪印象城 / 滨江），离她家彭埠或她公司黄龙近"
+  },
+  {
+   "k": "评分",
+   "v": "整条菜单 4.2–4.8，多数 ≥4.4；低于 4.3 基本不进"
+  }
+ ],
+ "groups": [
+  {
+   "key": "yue",
+   "title": "粤式清淡（鸡汤煲 / 粥底 / 潮汕鲜牛）",
+   "why": "现有菜单里最厚的一簇：5 家都是清汤、少辣、能一边涮一边说话。这组按「清汤锅 + 鲜切」继续找。",
+   "count": 6,
+   "items": [
+    {
+     "name": "汕尾尾鲜切鸡火锅",
+     "area": "商业体内（未标注）",
+     "cuisine": "粤式 · 清远鸡打边炉",
+     "price": null,
+     "reason": "径山鲜鸡现烫 15 秒，汤清回甘、不用冻货；但笔记里说门口贴了转让、老板想换地址，去前先确认还在原地。",
+     "note_title": "杭州 | 汕尾尾鲜切鸡肉火锅 被埋没的宝藏",
+     "note_url": "https://www.xiaohongshu.com/explore/69c22649000000001e00e5a7?xsec_token=ABNGqufU9Q7NKr8hplyWHsgwD3TgCQ39cxexcTw1_0tVg=&xsec_source=pc_search",
+     "likes": "4",
+     "cover": "/date_photos/cand/汕尾尾鲜切鸡火锅.webp"
+    },
+    {
+     "name": "中贸阿嬷清远鸡打边炉",
+     "area": "未标注",
+     "cuisine": "粤式 · 清远鸡打边炉",
+     "price": null,
+     "reason": "清鸡汤锅，桌距宽、还有小包间；博主给的评价是「及格但不算惊艳」，胜在清淡好聊、冬天一锅汤。",
+     "note_title": "吃饭日记｜中贸阿嬷清远鸡打边炉",
+     "note_url": "https://www.xiaohongshu.com/explore/6aebdf75000000000402f45c?xsec_token=AB_RoCnJmvaZjriXjmw3XL7wMPMOxzP4Cr-e8kU1xqpOA=&xsec_source=pc_search",
+     "likes": "4",
+     "cover": "/date_photos/cand/中贸阿嬷清远鸡打边炉.webp"
+    },
+    {
+     "name": "宽马记大排档",
+     "area": "上城区",
+     "cuisine": "潮汕鲜牛肉火锅",
+     "price": null,
+     "reason": "明档现切吊龙 / 匙仁，复古大排档风格；人均比连锁潮牛低，代价是声量偏大，适合不怕热闹的场合。",
+     "note_title": "在杭州吃上宽马记了！鲜牛肉火锅好过瘾",
+     "note_url": "https://www.xiaohongshu.com/explore/6ac75ce50000000012037429?xsec_token=ABTTTPq7c9KBrInCOJ7NVvF91p3NRi1QioaU3vgo1P33U=&xsec_source=pc_search",
+     "likes": "148",
+     "cover": "/date_photos/cand/宽马记大排档.webp"
+    },
+    {
+     "name": "泉市鲜活牛肉店",
+     "area": "未标注",
+     "cuisine": "潮汕鲜牛肉",
+     "price": null,
+     "reason": "二刷的鲜牛肉店：吊龙 10 秒、五花腱 15 秒，肉燥饭每次都点；只有口味，没有环境。",
+     "note_title": "泉市鲜活牛肉",
+     "note_url": "https://www.xiaohongshu.com/explore/69e9d7e2000000002202a682?xsec_token=AB_lFq6tWAdln8WrVefvVUW1D3UDhiRuKOLWLEPQIpIXg=&xsec_source=pc_search",
+     "likes": "108",
+     "cover": "/date_photos/cand/泉市鲜活牛肉店.webp"
+    },
+    {
+     "name": "阿盼鱼捞 · 斑鱼粥火锅",
+     "area": "未标注",
+     "cuisine": "粤式 · 粥底打边炉",
+     "price": 100,
+     "reason": "和禧粤鱼捞同一个路子（斑鱼 + 粥底），人均 100 上下；博主说菜不惊艳，但粥底值得二刷。",
+     "note_title": "杭州阿盼鱼捞·斑鱼粥火锅，好吃，爱吃❗️",
+     "note_url": "https://www.xiaohongshu.com/explore/6a0851fc000000003802308f?xsec_token=ABBrAFl7SvrGPSl2F6kahfvD_9k2pu-TjpyOOsvYVN690=&xsec_source=pc_search",
+     "likes": "6",
+     "cover": "/date_photos/cand/阿盼鱼捞斑鱼粥火锅.webp"
+    },
+    {
+     "name": "朱富贵火锅",
+     "area": "滨江 · 星光大道",
+     "cuisine": "小火锅",
+     "price": null,
+     "reason": "只有一条笔记、信息很少，先当「路过可看」：滨江商圈的网红小火锅。",
+     "note_title": "朱富贵的热闹也是凑上了🫕",
+     "note_url": "https://www.xiaohongshu.com/explore/6af49071000000002b01a767?xsec_token=ABzEO8AMgf_zzcxKz9oChC8wGnBR7kX0kGmMRd7IJhsVA=&xsec_source=pc_search",
+     "likes": "",
+     "cover": "/date_photos/cand/朱富贵火锅.webp"
+    }
+   ]
+  },
+  {
+   "key": "jiang",
+   "title": "江浙 · 杭帮 · 台州 · 素食",
+   "why": "菜单里 5 家江浙系（庆春里 / 兰桂江南 / 越稽 / 叶马 / 藏鲜工坊），共同点是本地口味、清淡、能久坐。",
+   "count": 5,
+   "items": [
+    {
+     "name": "南山南餐厅",
+     "area": "西湖 · 青芝坞",
+     "cuisine": "杭帮菜",
+     "price": null,
+     "reason": "黄鱼烧年糕、南山香烤鸡、元宝虾，典型杭帮甜咸口；青芝坞在西湖景区里，吃完能顺着走一圈。",
+     "note_title": "杭州西湖边好吃的杭帮菜！！南山南餐厅✨",
+     "note_url": "https://www.xiaohongshu.com/explore/6a83065a000000003300b09f?xsec_token=ABD37SLrNYx3qscHqT_xyvUaQt8w5gospoe-jfeoNQe_Q=&xsec_source=pc_search",
+     "likes": "12",
+     "cover": "/date_photos/cand/南山南餐厅.webp"
+    },
+    {
+     "name": "一恒一素",
+     "area": "拱墅 · 小河直街",
+     "cuisine": "纯净素",
+     "price": null,
+     "reason": "黑松露炒饭 + 猴头菇版酸菜鱼，安静不吵，和庆春里同一路子；运河边，吃完能逛小河直街。",
+     "note_title": "小河直街旁的纯净素食堂🍃一恒一素",
+     "note_url": "https://www.xiaohongshu.com/explore/6ad5ff37000000002503605c?xsec_token=AB5E-SneC5aEFTY3Kb_c8ltic5W-lOiRM_fSkfnF8_QsY=&xsec_source=pc_search",
+     "likes": "4",
+     "cover": "/date_photos/cand/一恒一素.webp"
+    },
+    {
+     "name": "汉舍小馆",
+     "area": "未标注（原黑珍珠）",
+     "cuisine": "京菜 · 烤鸭",
+     "price": 120,
+     "reason": "人均 120+ 的烤鸭馆，厨师当面片鸭有仪式感；掉了黑珍珠但烤鸭仍在线，不吃鸭就别去。",
+     "note_title": "杭州｜掉出黑珍珠榜的“汉舍小馆”↓",
+     "note_url": "https://www.xiaohongshu.com/explore/65e5b0cb0000000004000b43?xsec_token=ABXDQLH5eR_yY2ygiZL9oyLjX3Zqfq96T1-dojd2JOCr0=&xsec_source=pc_search",
+     "likes": "87",
+     "cover": "/date_photos/cand/汉舍小馆.webp"
+    },
+    {
+     "name": "荣小馆",
+     "area": "万象城",
+     "cuisine": "台州菜",
+     "price": null,
+     "reason": "新荣记平替：家烧黄鱼、沙蒜豆面、手打年糕；要提前一周订位，人均比新荣记低一档。",
+     "note_title": "杭州万象城｜荣小馆吃一顿地道台州菜🐟",
+     "note_url": "https://www.xiaohongshu.com/explore/6aa7fccc000000002b003e33?xsec_token=ABQTrDd-6Q_w3XpJCcxh81Ks4Rdm2sUpPlCqhWr0bANTg=&xsec_source=pc_search",
+     "likes": "17",
+     "cover": "/date_photos/cand/荣小馆.webp"
+    },
+    {
+     "name": "乔村二十八道",
+     "area": "萧山 · 钱塘江边",
+     "cuisine": "中餐（粤浙融合）",
+     "price": null,
+     "reason": "四层全窗、每桌有隔断，钱塘江一线视野；胡椒猪肚煲被夸爆，但人均可能超 150，先复核价格。",
+     "note_title": "乔村二十八道优劣测评真实版，杭州扛霸子",
+     "note_url": "https://www.xiaohongshu.com/explore/6a3fb03d000000000803eba1?xsec_token=ABxam2SHYyGAh3j23mBPgxeRXglAU0TfrnBq-EDbj3BY8=&xsec_source=pc_search",
+     "likes": "309",
+     "cover": "/date_photos/cand/乔村二十八道.webp"
+    }
+   ]
+  },
+  {
+   "key": "west",
+   "title": "有氛围的西餐 / 融合（出片、能聊天）",
+   "why": "泥靴 / 缦云里 / T-yoogee 那一类：灯光摆盘值钱，菜不难吃，适合要一点仪式感的晚上。",
+   "count": 5,
+   "items": [
+    {
+     "name": "PoDo in PoDo",
+     "area": "西溪印象城",
+     "cuisine": "创意西餐 · 融合",
+     "price": null,
+     "reason": "五刷的店，摆盘和氛围都出片；碳烤猪颈肉 + 辣奶油海鲜意面，约会向。",
+     "note_title": "🥘五刷PoDo杭州店实测｜不踩雷真实攻略✨",
+     "note_url": "https://www.xiaohongshu.com/explore/6a7d33c0000000003300a9d2?xsec_token=ABhtxeIdhMZ5MUuBIqhP5QFQQ_-a5_dTzvc9VESa601LY=&xsec_source=pc_search",
+     "likes": "49",
+     "cover": "/date_photos/cand/PoDoinPoDo.webp"
+    },
+    {
+     "name": "微风山丘",
+     "area": "滨江",
+     "cuisine": "餐酒馆",
+     "price": null,
+     "reason": "复古工业风 + 驻唱，晚上灯暗但不吵；烤鸡重、菌菇豆腐淡，一桌能坐很久。",
+     "note_title": "能从Brunch吃到深夜的微风山丘✨",
+     "note_url": "https://www.xiaohongshu.com/explore/6a1d2da4000000003701c6d0?xsec_token=AB-oWB-VjLzhOVTsahQGfO8HLvznuZHlLV-3KRTQ0_WJI=&xsec_source=pc_search",
+     "likes": "52",
+     "cover": "/date_photos/cand/微风山丘.webp"
+    },
+    {
+     "name": "BELLOCO 倍乐",
+     "area": "嘉里中心 HL106B",
+     "cuisine": "韩式创意料理",
+     "price": 150,
+     "reason": "人均 150 顶格的韩餐，铁锅猪颈肉和奶油意面是招牌；5 点线上取号可以完全不排队。",
+     "note_title": "杭州探店｜BELLOCO倍乐",
+     "note_url": "https://www.xiaohongshu.com/explore/6a8a9b24000000002802fb21?xsec_token=ABl4y7mOuMmc7ol9iWh3vE1JOQARyDf35nVi-JSQ2GOFw=&xsec_source=pc_search",
+     "likes": "54",
+     "cover": "/date_photos/cand/BELLOCO倍乐.webp"
+    },
+    {
+     "name": "Luback Dining",
+     "area": "湘湖",
+     "cuisine": "西餐",
+     "price": null,
+     "reason": "草坪 + 露台，出片极强；食物评价一般（披萨偏甜）。当「看景吃饭」用，别冲菜去。",
+     "note_title": "湘湖这家 Luback Dining，环境真的太美了",
+     "note_url": "https://www.xiaohongshu.com/explore/6a90e1b600000000070046af?xsec_token=ABAzyjxZuu5C0CJqdrC2H4DEzlqjLmhiIQ6Y9aUMK0RGM=&xsec_source=pc_search",
+     "likes": "10",
+     "cover": "/date_photos/cand/LubackDining.webp"
+    },
+    {
+     "name": "山河风味",
+     "area": "恒隆顶楼（运河边）",
+     "cuisine": "南北融合菜",
+     "price": null,
+     "reason": "宋韵木质调独栋 + 双厨坐镇的新店，菜品口碑好；人均待查，适合有由头的日子。",
+     "note_title": "杭州新店｜山河风味 中式老钱风美学餐厅 🥢",
+     "note_url": "https://www.xiaohongshu.com/explore/6a94214e000000002c03ff0d?xsec_token=ABSMSp2NeogSrbEz75gKd-N4O17gJ4h9DeWQn6vwsWERs=&xsec_source=pc_search",
+     "likes": "194",
+     "cover": "/date_photos/cand/山河风味.webp"
+    }
+   ]
+  },
+  {
+   "key": "jp",
+   "title": "日料",
+   "why": "寿司郎是唯一一家日料，补一个同类：人均低、翻台快、随时能去。",
+   "count": 1,
+   "items": [
+    {
+     "name": "博多天一",
+     "area": "湖滨银泰 in77",
+     "cuisine": "日料 · 天妇罗",
+     "price": null,
+     "reason": "现炸天妇罗套餐 + 舒芙蕾，翻台快；偏甜、味增汤寡淡，胜在人均低、位置就在湖滨。",
+     "note_title": "杭州博多天一天妇罗测评",
+     "note_url": "https://www.xiaohongshu.com/explore/6a6f55d2000000002701ea3a?xsec_token=ABkRENTc8F8WRZ8qt3jAJz76q-_CsD5ymsozRhyP-OE5U=&xsec_source=pc_search",
+     "likes": "286",
+     "cover": "/date_photos/cand/博多天一.webp"
+    }
+   ]
+  }
+ ],
+ "dropped": [
+  {
+   "name": "莫氏鸡煲",
+   "why": "笔记原文「一般，没啥特别的」，6/10，不值得占一个名额"
+  },
+  {
+   "name": "如院",
+   "why": "高端中餐，人均远超 150 的档位"
+  },
+  {
+   "name": "香楼",
+   "why": "西湖景区里，两个人吃了 1000+，超预算"
+  },
+  {
+   "name": "笑颜日料",
+   "why": "余杭区夫妻店，人均 500+"
+  },
+  {
+   "name": "朴竺 · 植物料理",
+   "why": "米其林绿星，超预算（与庆春里 / 一恒一素重复）"
+  },
+  {
+   "name": "O'eat",
+   "why": "测评里培根踩雷、鸡翅一般"
+  },
+  {
+   "name": "KIN Restaurant",
+   "why": "品牌对不上：抓到的正文写的是金泰兰，不是这家"
+  },
+  {
+   "name": "Moment·盈",
+   "why": "是演出场地，不是餐厅"
+  }
+ ],
+ "foot": "抓取时间 2026-11-12，小红书搜索结果（17 组关键词、399 篇笔记）。笔记里没写人均的，价格那一栏就空着，不代表便宜。排除项：莫氏鸡煲（笔记原文「一般，没啥特别的」，6/10，不值得占一个名额）；如院（高端中餐，人均远超 150 的档位）；香楼（西湖景区里，两个人吃了 1000+，超预算）；笑颜日料（余杭区夫妻店，人均 500+）；朴竺 · 植物料理（米其林绿星，超预算（与庆春里 / 一恒一素重复））；O'eat（测评里培根踩雷、鸡翅一般）；KIN Restaurant（品牌对不上：抓到的正文写的是金泰兰，不是这家）；Moment·盈（是演出场地，不是餐厅）。"
+}
