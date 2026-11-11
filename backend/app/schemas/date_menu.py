@@ -45,9 +45,36 @@ class DateItemUpdate(DateItemBase):
     pass
 
 
+class DatePhotoOut(BaseModel):
+    """一张实拍图。path 是站内路径（/date_photos/<slug>/01.webp），w/h 给前台占位用。"""
+
+    id: str = ""
+    path: str
+    w: int = 0
+    h: int = 0
+    caption: str = ""
+    source_url: str = ""
+    sort: int = 0
+
+
+class DatePhotoIn(BaseModel):
+    path: str = Field(max_length=255)
+    w: int = Field(default=0, ge=0)
+    h: int = Field(default=0, ge=0)
+    caption: str = Field(default="", max_length=400)
+    source_url: str = Field(default="", max_length=500)
+
+
+class DatePhotosIn(BaseModel):
+    """整组替换这家店的图（先删后插，顺序即数组顺序）。"""
+
+    photos: list[DatePhotoIn] = Field(default_factory=list)
+
+
 class DateItemOut(DateItemBase):
     id: str
     sort: int
+    photos: list[DatePhotoOut] = Field(default_factory=list, description="图集，第一张当封面")
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

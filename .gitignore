@@ -22,6 +22,9 @@ venv/
 # ── 动作演示媒体（本地获取，不随仓库分发）──────────────
 backend/media/
 
+# ── 约会页的餐厅实拍图（小红书素材，本地/服务器 scp，不入库）──
+backend/static/date_photos/
+
 # ── Impeccable（本地设计 skill）─────────────────────────
 # 引擎二进制 / 字体索引体积大，按需本地安装；skill 文本与 agents 可入库
 .claude/skills/impeccable/scripts/bin/
@@ -33,3 +36,7 @@ backend/media/
 # 本地设计工具与验收材料（不参与产品部署）
 .claude/
 .impeccable/
+
+# ── 小红书抓图脚本的登录态与中间产物 ──────────
+scripts/xhs_photos/profile/
+scripts/xhs_photos/out/

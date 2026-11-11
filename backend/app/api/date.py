@@ -18,12 +18,13 @@ from __future__ import annotations
 import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.models.date_menu import DateMenuItem
+from app.models.date_photo import DatePhoto
 from app.models.date_visit import DateVisit
 from app.models.message import KIND_USER, ROLE_ME, Message
 from app.schemas.date_menu import (
@@ -32,6 +33,8 @@ from app.schemas.date_menu import (
     DateItemCreate,
     DateItemOut,
     DateItemUpdate,
+    DatePhotoOut,
+    DatePhotosIn,
     DateVisitOut,
     ReorderIn,
 )
@@ -57,13 +60,48 @@ async def _ordered(db: AsyncSession, include_hidden: bool) -> list[DateMenuItem]
     return list((await db.execute(stmt)).scalars().all())
 
 
+async def _photos_of(db: AsyncSession, ids: list[str]) -> dict[str, list[DatePhotoOut]]:
+    """一次查完这批店的图，按 restaurant_id 分组（不要每家一条 SQL）。"""
+    if not ids:
+        return {}
+    rows = (
+        await db.execute(
+            select(DatePhoto)
+            .where(DatePhoto.restaurant_id.in_(ids))
+            .order_by(DatePhoto.restaurant_id, DatePhoto.sort, DatePhoto.id)
+        )
+    ).scalars().all()
+    out: dict[str, list[DatePhotoOut]] = {}
+    for p in rows:
+        out.setdefault(p.restaurant_id, []).append(
+            DatePhotoOut(id=p.id, path=p.path, w=p.w, h=p.h,
+                         caption=p.caption or "", source_url=p.source_url or "", sort=p.sort)
+        )
+    return out
+
+
+async def _with_photos(db: AsyncSession, rows: list[DateMenuItem]) -> list[DateItemOut]:
+    """菜单项 + 图集。photos 不是表里的列，所以在这里拼进去。"""
+    pmap = await _photos_of(db, [r.id for r in rows])
+    out: list[DateItemOut] = []
+    for r in rows:
+        item = DateItemOut.model_validate(r)
+        item.photos = pmap.get(r.id, [])
+        out.append(item)
+    return out
+
+
+async def _one_with_photos(db: AsyncSession, row: DateMenuItem) -> DateItemOut:
+    return (await _with_photos(db, [row]))[0]
+
+
 # ────────────────────────── public ──────────────────────────
 
 
 @public_router.get("/menu", response_model=list[DateItemOut])
 async def get_menu(db: AsyncSession = Depends(get_db)):
-    """前台菜单。隐藏项不出现。"""
-    return await _ordered(db, include_hidden=False)
+    """前台菜单。隐藏项不出现；每条带图集（第一张当前台封面）。"""
+    return await _with_photos(db, await _ordered(db, include_hidden=False))
 
 
 @public_router.get("/ping")
@@ -122,7 +160,7 @@ async def admin_check():
 @admin_router.get("/admin/items", response_model=list[DateItemOut], dependencies=[Depends(verify_date_admin)])
 async def admin_list(db: AsyncSession = Depends(get_db)):
     """后台列表：含隐藏项，顺序同前台。"""
-    return await _ordered(db, include_hidden=True)
+    return await _with_photos(db, await _ordered(db, include_hidden=True))
 
 
 @admin_router.get("/admin/visits", response_model=list[DateVisitOut], dependencies=[Depends(verify_date_admin)])
@@ -170,7 +208,7 @@ async def create_item(payload: DateItemCreate, db: AsyncSession = Depends(get_db
     db.add(row)
     await db.commit()
     await db.refresh(row)
-    return row
+    return await _one_with_photos(db, row)
 
 
 @admin_router.patch("/items/{item_id}", response_model=DateItemOut, dependencies=[Depends(verify_date_admin)])
@@ -182,7 +220,7 @@ async def update_item(item_id: str, payload: DateItemUpdate, db: AsyncSession = 
         setattr(row, key, value)
     await db.commit()
     await db.refresh(row)
-    return row
+    return await _one_with_photos(db, row)
 
 
 @admin_router.delete("/items/{item_id}", dependencies=[Depends(verify_date_admin)])
@@ -193,6 +231,39 @@ async def delete_item(item_id: str, db: AsyncSession = Depends(get_db)):
     # 探店记录是历史，不跟着菜单项删：把外键摘掉，店名快照还在。
     # SQLite 默认不启用外键约束，所以这里显式做，别只依赖 ondelete。
     await db.execute(update(DateVisit).where(DateVisit.restaurant_id == item_id).values(restaurant_id=None))
+    # 图跟着条目走（文件留在磁盘上，重新加回来还能用）
+    await db.execute(delete(DatePhoto).where(DatePhoto.restaurant_id == item_id))
+    await db.delete(row)
+    await db.commit()
+    return {"ok": True}
+
+
+@admin_router.post("/items/{item_id}/photos", response_model=list[DatePhotoOut],
+                   dependencies=[Depends(verify_date_admin)])
+async def set_photos(item_id: str, payload: DatePhotosIn, db: AsyncSession = Depends(get_db)):
+    """整组替换这家店的图集。
+
+    整组替换而不是逐张增删：抓图脚本一次拿到一组的顺序，前端封面取第一张，
+    顺序是内容的一部分。批量写图时调用方只需要一次请求。
+    """
+    row = (await db.execute(select(DateMenuItem).where(DateMenuItem.id == item_id))).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="没有这一条")
+    await db.execute(delete(DatePhoto).where(DatePhoto.restaurant_id == item_id))
+    for idx, p in enumerate(payload.photos):
+        db.add(DatePhoto(
+            restaurant_id=item_id, path=p.path, w=p.w, h=p.h,
+            caption=p.caption, source_url=p.source_url, sort=(idx + 1) * 10,
+        ))
+    await db.commit()
+    return (await _photos_of(db, [item_id])).get(item_id, [])
+
+
+@admin_router.delete("/photos/{photo_id}", dependencies=[Depends(verify_date_admin)])
+async def delete_photo(photo_id: str, db: AsyncSession = Depends(get_db)):
+    row = (await db.execute(select(DatePhoto).where(DatePhoto.id == photo_id))).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="没有这张图")
     await db.delete(row)
     await db.commit()
     return {"ok": True}

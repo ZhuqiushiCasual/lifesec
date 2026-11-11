@@ -1,4 +1,5 @@
 from app.models.date_menu import DateMenuItem
+from app.models.date_photo import DatePhoto
 from app.models.date_visit import DateVisit
 from app.models.event import Event
 from app.models.exercise import Exercise
@@ -23,6 +24,7 @@ __all__ = [
     "TagAlias",
     "JobRun",
     "DateMenuItem",
+    "DatePhoto",
     "DateVisit",
     "Exercise",
     "Workout",

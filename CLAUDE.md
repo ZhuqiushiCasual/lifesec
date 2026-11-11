@@ -169,8 +169,10 @@ Hermes     生成 + 迭代时钟        当前 User Message     4.3 迭代三时
 | GET | `/api/date/menu` | **约会挑餐厅**的前台菜单（**不需要 token**）：`ORDER BY sort, id`，隐藏项不返回 |
 | POST | `/api/date/choose` | 她挑完发的那句话：落一条 `messages(role=me)`，不调模型（**不需要 token**） |
 | — | `/api/date/admin/*`、`/api/date/items`、`/api/date/reorder` | 菜单增删改 + 上下移排序，需请求头 `X-Date-Password`（`DATE_ADMIN_PASSWORD`） |
+| POST | `/api/date/items/{id}/photos` | **整组替换**这家店的图集（顺序即封面优先级），需 `X-Date-Password` |
+| DELETE | `/api/date/photos/{id}` | 删一张图（只删记录，文件留在磁盘），需 `X-Date-Password` |
 | GET | `/api/date/admin/visits` | 探店记录查询（可按 `restaurant_id` 过滤），需 `X-Date-Password` |
-| GET | `/date` | 约会挑餐厅页面（给另一半看的短链接，静态 `static/date.html`） |
+| GET | `/date` | 约会挑餐厅页面：两列瀑布流（错版）+ 点开浮层翻图集，静态 `static/date.html` |
 | GET | `/health` | 健康检查（无鉴权） |
 | GET | `/` | 前端静态页 |
 
