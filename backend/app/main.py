@@ -5,11 +5,16 @@
 
 from contextlib import asynccontextmanager
 import logging
+import mimetypes
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+# 静态图里的 webp：python 的 mimetypes 表在 slim 镜像里不一定带它，
+# 不带就按 application/octet-stream 发出去（浏览器能显示，但语义错、CDN 也不当图缓存）
+mimetypes.add_type("image/webp", ".webp")
 
 # ── 日志 ──────────────────────────────────────────────────
 # uvicorn 只管自己的访问日志；应用自己的 logger（selfsec.*）默认会被 root logger

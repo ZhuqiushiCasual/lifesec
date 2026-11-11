@@ -25,7 +25,11 @@ def norm(s: str) -> str:
 
 
 def main():
-    menu = S.get(f"{BASE}/api/date/menu", timeout=20).json()
+    # 有密码就走后台列表（含隐藏项）：生产库里可能有前台看不到的条目，也要把图配上
+    url = f"{BASE}/api/date/admin/items" if PW else f"{BASE}/api/date/menu"
+    r = S.get(url, headers=H if PW else None, timeout=20)
+    r.raise_for_status()
+    menu = r.json()
     by_name = {norm(i["name"]): i for i in menu}
     print(f"菜单 {len(menu)} 条")
 
