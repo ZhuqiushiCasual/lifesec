@@ -27,6 +27,7 @@ class DateItemBase(BaseModel):
     metro: Optional[str] = None
     reach: Optional[str] = None
     tip: Optional[str] = None
+    parking: Optional[str] = Field(default=None, max_length=255)
     dist_km: Optional[float] = Field(default=None, ge=0, le=100)
     dist_work_km: Optional[float] = Field(default=None, ge=0, le=100)
     art: Optional[str] = Field(default=None, max_length=24)

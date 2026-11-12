@@ -48,6 +48,10 @@ class DateMenuItem(Base):
     metro: Mapped[str] = mapped_column(Text, nullable=False, default="", comment="最近地铁站 + 出口 + 步行")
     reach: Mapped[str] = mapped_column(Text, nullable=False, default="", comment="从三花国际怎么过去")
     tip: Mapped[str] = mapped_column(Text, nullable=False, default="", comment="点菜 / 避坑")
+    parking: Mapped[str] = mapped_column(
+        String(255), nullable=False, default="",
+        comment="停车：附近的库 / 距离 / 好不好停；地铁 500m 内的店留空",
+    )
 
     # 两个距离口径：家 = 三花国际（明月桥路×鸿泰路，彭埠站 A 口）；公司 = 黄龙体育中心
     dist_km: Mapped[float] = mapped_column(Float, nullable=False, default=0, comment="离家（三花国际）直线距离 km")

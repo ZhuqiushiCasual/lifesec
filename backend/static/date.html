@@ -265,6 +265,8 @@
   .go div{font-size:12.5px;color:var(--ink2);line-height:1.6}
   .go div+div{margin-top:5px;padding-top:5px;border-top:1px dashed var(--line)}
   .tip{font-size:12.5px;color:#8A6A3E;background:#FDF7EA;border:1px solid #F2E5C8;border-radius:11px;padding:9px 12px;line-height:1.6}
+  .park{font-size:12.5px;color:#4C6B7F;background:#F3F7FA;border:1px solid #DCE6EE;border-radius:11px;padding:9px 12px;line-height:1.6;margin:0 0 10px}
+  .park b{display:block;font-size:10.5px;letter-spacing:.12em;color:#7B96A8;font-weight:700;margin-bottom:3px}
 
   .pfoot{
     position:sticky;bottom:0;z-index:4;
@@ -838,6 +840,7 @@ function renderDetail(r){
       <div>${esc(r.metro)}</div>
       <div>${esc(r.reach)}</div>
     </div>
+    ${r.parking ? `<div class="park"><b>停车</b>${esc(r.parking)}</div>` : ''}
     <div class="tip"><b>点菜小抄</b>${esc(r.tip)}</div>
     <div style="height:6px"></div>`;
   $('#footName').textContent = r.name;
@@ -1072,6 +1075,7 @@ function renderForm(r){
     <div class="form-item"><label>最近地铁 + 步行</label><textarea id="f_metro">${esc(d.metro)}</textarea></div>
     <div class="form-item"><label>怎么过去（从家出发）</label><textarea id="f_reach">${esc(d.reach)}</textarea></div>
     <div class="form-item"><label>点菜小抄</label><textarea id="f_tip">${esc(d.tip)}</textarea></div>
+    <div class="form-item"><label>停车（地铁 500m 内可留空）</label><textarea id="f_parking">${esc(d.parking || '')}</textarea></div>
     <div class="form-item"><label>实拍图（${phs.length} 张，★ 设为封面，✕ 删）</label>
       ${phs.length ? `<div class="aphotos">${phs.map((p, idx) => `<div class="ph"><img src="${esc(p.path)}" alt="">
           <button class="star ${idx === 0 ? 'on' : ''}" data-idx="${idx}" title="设为封面">★</button>
@@ -1137,6 +1141,7 @@ async function saveForm(id){
     taste_light: num('f_light'), taste_spicy: num('f_spicy'), taste_oil: num('f_oil'),
     taste_label: val('f_tlabel') || '清淡', taste_kind: document.getElementById('f_tkind').value,
     reason: val('f_reason'), metro: val('f_metro'), reach: val('f_reach'), tip: val('f_tip'),
+    parking: val('f_parking'),
     art: document.getElementById('f_art').value,
     accent_a: (editing && editing.accent_a) || '#FDF1E7',
     accent_b: (editing && editing.accent_b) || '#F8E2D2',
