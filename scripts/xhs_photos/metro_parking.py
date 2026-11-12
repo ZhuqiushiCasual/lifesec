@@ -11,6 +11,7 @@
     python metro_parking.py 宽马记大排档  # 只看某一家
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -93,6 +94,39 @@ def parking_near(name: str, point, limit_km: float = 0.8):
     return sorted(((d, n, a) for n, (d, a) in out.items()))
 
 
+def parse_metro(text: str):
+    """从手写的 metro 字段里读「最近站 + 步行米数」。
+
+    菜单里的 metro 是人对着门店地址核过的，比按店名反查 POI 准得多：
+    多分店品牌（虾佬九 / 梅溪徐记 / 竹间三喜）按名字查会命中别的分店，
+    曾经算出「虾佬九离地铁 3885 m」这种离谱结果。
+    返回 (站名, 米数 or None, 是否直连/上盖/商场内)。
+    """
+    if not text:
+        return None, None, False
+    t = text.replace(" ", "")
+    stations = re.findall(r"[\u4e00-\u9fa5]{2,8}站", t.split("步行")[0])
+    station = stations[-1] if stations else None
+    if station:
+        station = re.sub(r"^(地铁|号线|号线|线)+", "", station)
+
+    meters = None
+    m = re.search(r"步行约?\s*(\d+(?:\.\d+)?)\s*(米|m|公里|km)", t)
+    if m:
+        meters = float(m.group(1)) * (1000 if m.group(2) in ("公里", "km") else 1)
+    else:
+        m = re.search(r"(\d+(?:\.\d+)?)\s*(米|m|公里|km)", t)      # 「站 约 4 km」
+        if m:
+            meters = float(m.group(1)) * (1000 if m.group(2) in ("公里", "km") else 1)
+        else:
+            m = re.search(r"步行约?\s*(\d+)\s*分钟", t)
+            if m:
+                meters = float(m.group(1)) * 70                     # 每分钟约 70 m
+
+    direct = bool(re.search(r"直连|直达|直通|上盖|商场.*内|地铁口直连", t))
+    return station, meters, direct
+
+
 def main():
     only = sys.argv[1:]
     import requests
@@ -106,23 +140,32 @@ def main():
     for it in menu:
         if only and not any(k in it["name"] for k in only):
             continue
+        station_txt, meters, direct = parse_metro(it.get("metro", ""))
         p = restaurant_point(it["name"], it.get("metro", ""))
-        if not p:
-            print(f"{it['name']}: 取不到坐标，跳过")
+        if meters is not None:
+            # 手写字段优先：它是对着门店地址核过的
+            d, st = (meters / 1000.0), (station_txt or "（见 metro）")
+            src = "metro字段"
+        elif station_txt and direct:
+            # 写了站名 + 直连/商场内但没写米数（如嘉里中心 4 层）：按「就在地铁旁」处理，不误判成远
+            d, st, src = 0.0, station_txt, "metro字段(直连)"
+        else:
+            print(f"{it['name']}: metro 没写步行米数，距离待人工确认（不参与 >500m 判定）")
             continue
-        near = sorted((coords.haversine(p, c), s) for s, c in stations.items())
-        d, st = near[0]
-        rows.append((d, st, it["name"], p, it))
+        rows.append((d, st, it["name"], p, it, src))
 
     rows.sort(reverse=True)
-    print(f"{'店名':20} {'最近站':10} {'直线':>6}  是否 >500m")
-    for d, st, name, p, it in rows:
-        flag = "★ 超过 500m" if d > 0.5 else ""
-        print(f"{name[:18]:20} {st:10} {d*1000:5.0f}m  {flag}")
+    print(f"{'店名':20} {'最近站':12} {'直线':>7}  来源")
+    for d, st, name, p, it, src in rows:
+        flag = "  ★ >500m" if d > 0.5 else ""
+        print(f"{name[:18]:20} {st:12} {d*1000:6.0f}m  {src}{flag}")
 
     far = [r for r in rows if r[0] > 0.5]
     print(f"\n===== 超过 500 m 的 {len(far)} 家，查停车场 =====")
-    for d, st, name, p, it in far:
+    for d, st, name, p, it, src in far:
+        if not p:
+            print(f"\n{name}（{st} {d*1000:.0f} m）：取不到坐标，停车场需要人工看地图")
+            continue
         print(f"\n{name}（最近地铁 {st} {d*1000:.0f} m）")
         spots = parking_near(name, p)
         if not spots:
