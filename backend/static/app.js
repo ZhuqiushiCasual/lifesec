@@ -973,7 +973,7 @@ async function loadNearby() {
           ${r.branch ? `<span class="nc-branch">${esc(r.branch.split(/[ ,]/)[0])}</span>` : ''}
         </div>
         <div class="nc-meta">
-          ${(r.tags || []).slice(0, 1).map((t) => `<i class="nc-chip">${esc(t)}</i>`).join('')}
+          <i class="nc-chip c-${esc(r.category)}">${esc(r.category_label || '')}</i>
           <span class="nc-sub">${esc(r.sub || '')}</span>
         </div>
         <div class="nc-why">${esc(r.note || '')}</div>
