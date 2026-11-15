@@ -848,7 +848,7 @@ function openOptionDetail(kind, id) {
       <div class="exp-hero">
         ${placeArt('eat', option.name, meta.cover || meta.photo, 'hero-pic', true)}
         <div class="exp-hero-text">
-          <span class="exp-hero-kicker">${esc(option.subtitle || '')}</span>
+          <span class="exp-hero-kicker">${esc((option.subtitle || '').split(' · ')[0])}</span>
           <h2 class="exp-hero-title">${esc(option.name)}</h2>
           ${facts ? `<span class="exp-hero-facts">${esc(facts)}</span>` : ''}
         </div>
@@ -866,7 +866,7 @@ function openOptionDetail(kind, id) {
       <div class="exp-hero">
         ${placeArt(cat, option.name, meta.cover, 'hero-pic', true)}
         <div class="exp-hero-text">
-          <span class="exp-hero-kicker">${esc(option.subtitle || '')}</span>
+          <span class="exp-hero-kicker">${esc((option.subtitle || '').split(' · ')[0])}</span>
           <h2 class="exp-hero-title">${esc(option.name)}</h2>
           ${(meta.tags || []).length ? `<span class="exp-hero-facts">${esc(meta.tags.join(' · '))}</span>` : ''}
         </div>
@@ -976,7 +976,7 @@ async function loadNearby() {
           ${(r.tags || []).slice(0, 1).map((t) => `<i class="nc-chip">${esc(t)}</i>`).join('')}
           <span class="nc-sub">${esc(r.sub || '')}</span>
         </div>
-        <div class="nc-why">${esc(r.reason || '')}</div>
+        <div class="nc-why">${esc(r.note || '')}</div>
       </div>
       <div class="nc-side">
         <span class="nc-dist ${r.tier}">${esc(distLabel(r))}</span>

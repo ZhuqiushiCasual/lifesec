@@ -381,8 +381,6 @@ def to_row(anchor: Place, r: dict, cover: Optional[str] = None) -> dict:
         else:
             if tags:
                 sub_bits.append(tags[0])
-            if attrs.get("note"):
-                sub_bits.append(str(attrs["note"]).split("。")[0][:16])
     return {
         "place_id": p.id,
         "kind": p.kind,                 # food / outing —— 前端拿它直接复用安排流程
@@ -400,6 +398,7 @@ def to_row(anchor: Place, r: dict, cover: Optional[str] = None) -> dict:
         "visits": r.get("visits", 0),
         "score": r["score"],
         "sub": " · ".join([b for b in sub_bits if b]),
+        "note": (str(attrs.get("note") or "").split("。")[0])[:40],
         "tags": [t for t in attrs.get("tags") or [] if t][:2],
         "cover": cover,
         "reason": reason(anchor, p, walk if tier != "far" else None, km),
