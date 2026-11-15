@@ -317,6 +317,26 @@ async def nearby(
     return out
 
 
+async def covers_for(db: AsyncSession, menu_ids: Iterable[str]) -> dict[str, str]:
+    """餐厅封面：date_photos 里排第一的那张。玩点没有图，返回空，由前端画插画。"""
+    ids = [i for i in menu_ids if i]
+    if not ids:
+        return {}
+    from app.models.date_photo import DatePhoto
+
+    rows = (
+        await db.execute(
+            select(DatePhoto)
+            .where(DatePhoto.restaurant_id.in_(ids))
+            .order_by(DatePhoto.restaurant_id, DatePhoto.sort, DatePhoto.id)
+        )
+    ).scalars().all()
+    out: dict[str, str] = {}
+    for photo in rows:
+        out.setdefault(photo.restaurant_id, photo.path)
+    return out
+
+
 async def place_by_ref(db: AsyncSession, kind: str, ref_id: str) -> Optional[Place]:
     """用领域表的 id 找到地点：kind = food / outing。"""
     if kind == "food":
@@ -336,7 +356,7 @@ async def _by_key(db: AsyncSession, key: str) -> Optional[Place]:
     return (await db.execute(select(Place).where(Place.canonical_key == key))).scalars().first()
 
 
-def to_row(anchor: Place, r: dict) -> dict:
+def to_row(anchor: Place, r: dict, cover: Optional[str] = None) -> dict:
     p: Place = r["place"]
     walk = r["walk"]
     tier = r.get("tier", "walk")
@@ -380,6 +400,8 @@ def to_row(anchor: Place, r: dict) -> dict:
         "visits": r.get("visits", 0),
         "score": r["score"],
         "sub": " · ".join([b for b in sub_bits if b]),
+        "tags": [t for t in attrs.get("tags") or [] if t][:2],
+        "cover": cover,
         "reason": reason(anchor, p, walk if tier != "far" else None, km),
     }
 

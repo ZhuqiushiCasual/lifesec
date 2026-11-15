@@ -100,6 +100,7 @@ async def get_options(
         rows = (
             await db.execute(stmt.order_by(DateMenuItem.sort, DateMenuItem.id))
         ).scalars().all()
+        covers = await place.covers_for(db, [row.id for row in rows])
         return [
             {
                 "id": row.id,
@@ -108,6 +109,7 @@ async def get_options(
                 "tags": [row.cuisine] if row.cuisine else [],
                 "meta": {
                     "reason": row.reason,
+                    "cover": covers.get(row.id),
                     "dist_km": row.dist_km,
                     "dist_work_km": row.dist_work_km,
                     "price": row.price,
@@ -291,12 +293,18 @@ async def get_nearby(
         raise HTTPException(status_code=404, detail="地点不存在")
 
     rows = await place.nearby(db, anchor, want, max_walk=max_walk, limit=limit)
+    covers = await place.covers_for(
+        db, [r["place"].source_ref for r in rows if r["place"].category == "eat"]
+    )
     return {
         "anchor": place.to_anchor(anchor),
         "want": want,
         "want_label": place.WANTS.get(want, place.WANTS[place.DEFAULT_WANT])["label"],
         "max_walk": max_walk,
-        "rows": [place.to_row(anchor, row) for row in rows],
+        "rows": [
+            place.to_row(anchor, row, covers.get(row["place"].source_ref or ""))
+            for row in rows
+        ],
     }
 
 

@@ -836,32 +836,46 @@ function openOptionDetail(kind, id) {
         <button class="insight-more" data-detail-arrange="workout" data-id="${esc(id)}">单独安排</button>
       </div>`;
   } else if (kind === 'food') {
-    const thumb = meta.photo
-      ? `<img class="option-thumb" src="${esc(meta.photo)}" alt="">`
-      : `<span class="option-tile" style="background:${esc(meta.accent_a || 'var(--panel)')}">${esc((option.name || '?').slice(0, 1))}</span>`;
-    const facts = [meta.dist_km ? `${meta.dist_km} km` : '', meta.price ? `¥${meta.price}` : '', meta.score ? `${meta.score} 分` : '']
+    const facts = [
+      meta.dist_km ? `离家 ${meta.dist_km} km` : '',
+      meta.price ? `人均 ¥${meta.price}` : '',
+      meta.score ? `${meta.score} 分` : '',
+    ]
       .filter(Boolean)
       .join(' · ');
     $('#exp-kicker').textContent = '餐厅';
     $('#exp-body').innerHTML = `
-      <div class="plan-ref-head">${thumb}<span><span class="option-name">${esc(option.name)}</span><span class="option-meta">${esc(option.subtitle || '')}</span></span></div>
-      ${meta.reason ? `<div class="option-reason">${esc(meta.reason)}</div>` : ''}
-      ${facts ? `<div class="option-facts">${esc(facts)}</div>` : ''}
+      <div class="exp-hero">
+        ${placeArt('eat', option.name, meta.cover || meta.photo, 'hero-pic')}
+        <div class="exp-hero-text">
+          <span class="exp-hero-kicker">${esc(option.subtitle || '')}</span>
+          <h2 class="exp-hero-title">${esc(option.name)}</h2>
+          ${facts ? `<span class="exp-hero-facts">${esc(facts)}</span>` : ''}
+        </div>
+      </div>
+      ${meta.reason ? `<div class="exp-quote">${esc(meta.reason)}</div>` : ''}
       <div class="plan-actions">
         <button class="ob-primary" data-detail-arrange="food" data-id="${esc(id)}">安排到某天</button>
       </div>
-      <div class="near-block" data-near-kind="food" data-near-id="${esc(id)}" data-near-current="stroll"></div>`;
+      <div class="near-block" data-near-kind="food" data-near-id="${esc(id)}" data-near-name="${esc(option.name)}" data-near-current="stroll"></div>`;
   } else {
+    const OUTING_CAT = { 展馆: 'exhibit', 公园: 'park', 街区: 'street', 景点: 'play', 活动: 'play' };
+    const cat = OUTING_CAT[meta.kind] || 'play';
     $('#exp-kicker').textContent = '出门';
     $('#exp-body').innerHTML = `
-      <div class="exp-meta">${esc(option.subtitle || '')}</div>
-      <h2 class="exp-title">${esc(option.name)}</h2>
-      ${meta.note ? `<div class="option-reason">${esc(meta.note)}</div>` : ''}
-      ${(meta.tags || []).length ? `<div class="option-facts">${esc(meta.tags.join(' / '))}</div>` : ''}
+      <div class="exp-hero">
+        ${placeArt(cat, option.name, meta.cover, 'hero-pic')}
+        <div class="exp-hero-text">
+          <span class="exp-hero-kicker">${esc(option.subtitle || '')}</span>
+          <h2 class="exp-hero-title">${esc(option.name)}</h2>
+          ${(meta.tags || []).length ? `<span class="exp-hero-facts">${esc(meta.tags.join(' · '))}</span>` : ''}
+        </div>
+      </div>
+      ${meta.note ? `<div class="exp-quote">${esc(meta.note)}</div>` : ''}
       <div class="plan-actions">
         <button class="ob-primary" data-detail-arrange="outing" data-id="${esc(id)}">安排到某天</button>
       </div>
-      <div class="near-block" data-near-kind="outing" data-near-id="${esc(id)}" data-near-current="eat"></div>`;
+      <div class="near-block" data-near-kind="outing" data-near-id="${esc(id)}" data-near-name="${esc(option.name)}" data-near-current="eat"></div>`;
   }
 
   $('#experience').hidden = false;
@@ -869,68 +883,141 @@ function openOptionDetail(kind, id) {
   loadNearby();
 }
 
+/* ---------- 地点周边的视觉：有实拍用实拍，没图用分类插画 ----------
+   餐厅有 date_photos（后台排过序的第一张）；玩点没有图，用同一套纸色画线稿。
+   不拿占位图冒充实拍，也不借别人的图。 */
+const ART_TINT = {
+  eat: ['#FBEFE9', '#F1D8CD'],
+  park: ['#EFF2E5', '#DCE4C8'],
+  street: ['#FBF4E4', '#F1E3C7'],
+  exhibit: ['#F3F0EB', '#E4DDD2'],
+  shop: ['#F6F0E8', '#E9DECE'],
+  play: ['#F0F3E7', '#DEE7CD'],
+};
+const ART_GLYPH = {
+  eat: '<path d="M9 20h22a11 11 0 0 1-22 0Z"/><path d="M15 15c0-2 1.6-2 1.6-4M20 15c0-2 1.6-2 1.6-4M25 15c0-2 1.6-2 1.6-4"/>',
+  park: '<path d="M20 8l8.5 12.5h-17Z"/><path d="M20 20.5V30M16 30h8"/>',
+  street: '<path d="M10 30V14h7v16M17 30V18h7v12M24 30V10h7v20"/><path d="M12.5 17.5h2M12.5 21h2M25.5 13.5h2M25.5 17h2"/>',
+  exhibit: '<rect x="9.5" y="12" width="21" height="16" rx="1.5"/><path d="M12.5 24.5l5-5.5 3.6 4.2 2.6-2.6 2.3 3.9"/>',
+  shop: '<path d="M12 16h16l-1.7 14H13.7Z"/><path d="M16 16a4 4 0 0 1 8 0"/>',
+  play: '<path d="M8.5 28l8-12.5 4.8 6.8 2.8-3.8 6.4 9.5Z"/><circle cx="27" cy="12" r="2.4"/>',
+};
+
+function placeArt(category, name, cover, cls) {
+  if (cover) {
+    return `<span class="art ${cls}"><img src="${esc(cover)}" alt="" loading="lazy" decoding="async"></span>`;
+  }
+  const tint = ART_TINT[category] || ART_TINT.play;
+  const glyph = ART_GLYPH[category] || ART_GLYPH.play;
+  return `<span class="art ${cls} art-line" style="--a:${tint[0]};--b:${tint[1]}">
+      <svg viewBox="0 0 40 40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"
+           stroke-linecap="round" stroke-linejoin="round">${glyph}</svg>
+      <i>${esc((name || '·').slice(0, 1))}</i>
+    </span>`;
+}
+
 /* ---------- 地点周边（一个查询，三个意图） ----------
    后端只有一个 nearby(anchor, want)；换标签只是换 want，换锚点只是换 anchor。
    走的到 / 打车顺路 / 没坐标 三档由后端给，前端只负责分组显示。 */
+const ICON = {
+  stroll: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="3.4" r="1.7"/><path d="M8 5.6v4l-2.4 4M8 9.6l2.4 4M5.2 8.2h5.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  eat: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.2 8.4h9.6a4.8 4.8 0 0 1-9.6 0Z" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 6.2c0-1 .8-1 .8-2M9 6.2c0-1 .8-1 .8-2" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>',
+  indoor: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.6c2.6 3 3.6 4.6 3.6 6.4A3.6 3.6 0 0 1 8 12.6a3.6 3.6 0 0 1-3.6-3.6C4.4 7.2 5.4 5.6 8 2.6Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+};
 const NEAR_WANTS = [
   ['stroll', '饭后走走'],
   ['eat', '就近吃'],
   ['indoor', '雨天'],
 ];
 const TIER_LABEL = { walk: '走得到', far: '打车顺路', unknown: '没坐标' };
+const TIER_HINT = { walk: '20 分钟内走过去', far: '打车顺路，顺便去', unknown: '地图库里没有坐标' };
 
 async function loadNearby() {
   const box = $('#exp-body .near-block');
   if (!box) return;
   const kind = box.dataset.nearKind;
   const id = box.dataset.nearId;
+  const anchorName = box.dataset.nearName || '';
   let want = box.dataset.nearCurrent || 'stroll';
   let data = null;
 
+  const head = (name) => `
+    <div class="near-head">
+      <span class="near-title">附近</span>
+      <span class="near-anchor">以「${esc(name || anchorName)}」为中心</span>
+    </div>
+    <div class="near-tabs">${NEAR_WANTS.map(
+      ([k, label]) =>
+        `<button class="near-tab${k === want ? ' on' : ''}" data-near-want="${k}">${ICON[k]}<span>${label}</span></button>`
+    ).join('')}</div>`;
+
+  const skeleton = `<div class="near-skel">${'<div class="skel-row"><span class="skel-pic"></span><span class="skel-lines"><i></i><i></i></span></div>'.repeat(3)}</div>`;
+
+  const distLabel = (r) => {
+    if (r.tier === 'walk') return `走 ${r.walk_min} 分`;
+    if (r.tier === 'far') return `${r.distance_km} km · 打车 ${r.drive_min} 分`;
+    return '没坐标';
+  };
+
+  const card = (r, i) => `
+    <div class="near-card${r.tier === 'unknown' ? ' faded' : ''}"
+         data-near-goto="${esc(r.kind)}:${esc(r.id)}" data-near-name="${esc(r.name)}"
+         style="--i:${i}">
+      ${placeArt(r.category, r.name, r.cover, 'pic')}
+      <div class="nc-body">
+        <div class="nc-top">
+          <span class="nc-name">${esc(r.name)}</span>
+          ${r.branch ? `<span class="nc-branch">${esc(r.branch.split(/[ ,]/)[0])}</span>` : ''}
+        </div>
+        <div class="nc-meta">
+          ${(r.tags || []).slice(0, 1).map((t) => `<i class="nc-chip">${esc(t)}</i>`).join('')}
+          <span class="nc-sub">${esc(r.sub || '')}</span>
+        </div>
+        <div class="nc-why">${esc(r.reason || '')}</div>
+      </div>
+      <div class="nc-side">
+        <span class="nc-dist ${r.tier}">${esc(distLabel(r))}</span>
+        <button class="nc-go" data-near-arrange="${esc(r.kind)}" data-id="${esc(r.id)}"
+                data-name="${esc(r.name)}">安排</button>
+      </div>
+    </div>`;
+
   const paint = () => {
-    const tabs = NEAR_WANTS.map(
-      ([k, label]) => `<button class="near-tab${k === want ? ' on' : ''}" data-near-want="${k}">${label}</button>`
-    ).join('');
     if (!data) {
-      box.innerHTML = `<div class="near-head"><span>附近</span></div><div class="near-tabs">${tabs}</div>
-        <div class="near-empty">正在找…</div>`;
+      box.innerHTML = head() + skeleton;
       return;
     }
     const rows = data.rows || [];
     if (!rows.length) {
-      box.innerHTML = `<div class="near-head"><span>附近</span></div><div class="near-tabs">${tabs}</div>
-        <div class="near-empty">20 分钟走得到的地方还没有收录，等图谱补点。</div>`;
+      box.innerHTML = head() + `
+        <div class="near-empty">
+          <b>这一带还没有收录</b>
+          <span>20 分钟走得到的地方还没进图谱，等补点。</span>
+        </div>`;
       return;
     }
+    let html = head(data.anchor.name);
     let lastTier = null;
-    const rowsHTML = rows
-      .map((r) => {
-        const label =
-          r.tier === 'walk' ? `走 ${r.walk_min} 分`
-          : r.tier === 'far' ? `${r.distance_km} km · 打车 ${r.drive_min} 分`
-          : '—';
-        const head = r.tier !== lastTier ? `<div class="near-tier">${TIER_LABEL[r.tier] || ''}</div>` : '';
+    let index = 0;
+    for (const r of rows) {
+      if (r.tier !== lastTier) {
+        if (lastTier) html += '</div>';
+        html += `<div class="near-group"><div class="near-tier"><span>${TIER_LABEL[r.tier] || ''}</span><i>${TIER_HINT[r.tier] || ''}</i></div>`;
         lastTier = r.tier;
-        return `${head}
-          <div class="near-row${r.tier === 'unknown' ? ' dim' : ''}" data-near-goto="${esc(r.kind)}:${esc(r.id)}" data-near-name="${esc(r.name)}">
-            <span class="near-main">
-              <span class="near-name">${esc(r.name)}${r.branch ? `<span class="near-branch">${esc(r.branch)}</span>` : ''}</span>
-              <span class="near-sub">${esc(r.sub || '')}</span>
-            </span>
-            <span class="near-walk">${esc(label)}</span>
-            <button class="near-arrange" data-near-arrange="${esc(r.kind)}" data-id="${esc(r.id)}" data-name="${esc(r.name)}">安排</button>
-          </div>`;
-      })
-      .join('');
-    box.innerHTML = `<div class="near-head"><span>附近</span><span class="near-anchor">以「${esc(data.anchor.name)}」为中心</span></div>
-      <div class="near-tabs">${tabs}</div>${rowsHTML}`;
+      }
+      html += card(r, index++);
+    }
+    html += '</div>';
+    box.innerHTML = html;
   };
 
   paint();
   try {
-    data = await api(`/api/life/nearby?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}&want=${want}&limit=5`);
+    data = await api(
+      `/api/life/nearby?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}&want=${want}&limit=5`
+    );
   } catch (e) {
-    box.innerHTML = `<div class="near-head"><span>附近</span></div><div class="near-empty">没找到：${esc(e.message)}</div>`;
+    box.innerHTML = head() + `<div class="near-empty"><b>没找到</b><span>${esc(e.message)}</span></div>`;
     return;
   }
   paint();
