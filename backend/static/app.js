@@ -915,7 +915,6 @@ function placeArt(category, name, cover, cls, eager) {
   return `<span class="art ${cls} art-line" style="--a:${tint[0]};--b:${tint[1]}">
       <svg viewBox="0 0 40 40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"
            stroke-linecap="round" stroke-linejoin="round">${glyph}</svg>
-      <i>${esc((name || '·').slice(0, 1))}</i>
       ${img}
     </span>`;
 }
