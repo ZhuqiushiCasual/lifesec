@@ -580,7 +580,7 @@ body{
 
 /* 图 / 插画 */
 .art{position:relative;display:block;overflow:hidden;flex:0 0 auto;border-radius:9px;background:var(--panel)}
-.art img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s cubic-bezier(.2,.6,.3,1)}
+.art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:2;transition:transform .5s cubic-bezier(.2,.6,.3,1)}
 .near-card:hover .art img{transform:scale(1.04)}
 .art.pic{width:72px;height:72px}
 .art.pic.art-line{background:linear-gradient(150deg,var(--a),var(--b))}

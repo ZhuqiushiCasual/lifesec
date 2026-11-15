@@ -846,7 +846,7 @@ function openOptionDetail(kind, id) {
     $('#exp-kicker').textContent = '餐厅';
     $('#exp-body').innerHTML = `
       <div class="exp-hero">
-        ${placeArt('eat', option.name, meta.cover || meta.photo, 'hero-pic')}
+        ${placeArt('eat', option.name, meta.cover || meta.photo, 'hero-pic', true)}
         <div class="exp-hero-text">
           <span class="exp-hero-kicker">${esc(option.subtitle || '')}</span>
           <h2 class="exp-hero-title">${esc(option.name)}</h2>
@@ -864,7 +864,7 @@ function openOptionDetail(kind, id) {
     $('#exp-kicker').textContent = '出门';
     $('#exp-body').innerHTML = `
       <div class="exp-hero">
-        ${placeArt(cat, option.name, meta.cover, 'hero-pic')}
+        ${placeArt(cat, option.name, meta.cover, 'hero-pic', true)}
         <div class="exp-hero-text">
           <span class="exp-hero-kicker">${esc(option.subtitle || '')}</span>
           <h2 class="exp-hero-title">${esc(option.name)}</h2>
@@ -903,16 +903,19 @@ const ART_GLYPH = {
   play: '<path d="M8.5 28l8-12.5 4.8 6.8 2.8-3.8 6.4 9.5Z"/><circle cx="27" cy="12" r="2.4"/>',
 };
 
-function placeArt(category, name, cover, cls) {
-  if (cover) {
-    return `<span class="art ${cls}"><img src="${esc(cover)}" alt="" loading="lazy" decoding="async"></span>`;
-  }
+function placeArt(category, name, cover, cls, eager) {
+  // 插画永远画在底下当兜底：图挂了、还没加载完，都不会出现空白块
   const tint = ART_TINT[category] || ART_TINT.play;
   const glyph = ART_GLYPH[category] || ART_GLYPH.play;
+  const img = cover
+    ? `<img src="${esc(cover)}" alt="" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async"
+            onerror="this.style.display='none'">`
+    : '';
   return `<span class="art ${cls} art-line" style="--a:${tint[0]};--b:${tint[1]}">
       <svg viewBox="0 0 40 40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"
            stroke-linecap="round" stroke-linejoin="round">${glyph}</svg>
       <i>${esc((name || '·').slice(0, 1))}</i>
+      ${img}
     </span>`;
 }
 
