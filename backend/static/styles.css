@@ -651,7 +651,7 @@ body{
 }
 .exp-hero .art{width:100%;height:100%}
 .exp-hero-text{
-  position:absolute;inset:auto 0 0 0;padding:34px 14px 12px;
+  position:absolute;inset:auto 0 0 0;z-index:3;padding:34px 14px 12px;
   background:linear-gradient(to top,rgba(251,246,238,.97) 24%,rgba(251,246,238,.72) 62%,rgba(251,246,238,0) 100%);
 }
 .exp-hero-kicker{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.04em;margin-bottom:3px}
