@@ -907,8 +907,9 @@ function placeArt(category, name, cover, cls, eager) {
   // 插画永远画在底下当兜底：图挂了、还没加载完，都不会出现空白块
   const tint = ART_TINT[category] || ART_TINT.play;
   const glyph = ART_GLYPH[category] || ART_GLYPH.play;
+  // 一屏最多 5 张、都带插画兜底，就不做懒加载了：宁可多传几十 KB，也不要出现空白块
   const img = cover
-    ? `<img src="${esc(cover)}" alt="" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async"
+    ? `<img src="${esc(cover)}" alt="" ${eager ? 'fetchpriority="high"' : ''} decoding="async"
             onerror="this.style.display='none'">`
     : '';
   return `<span class="art ${cls} art-line" style="--a:${tint[0]};--b:${tint[1]}">
