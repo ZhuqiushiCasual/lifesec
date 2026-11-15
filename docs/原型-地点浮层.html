@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UI 设计 v1：一个浮层，三个标签，换了锚点就换了答案</title>
+<style>
+:root{
+  --bg:#FAF5EC; --panel:#F2EADF; --card:#FFFDF8;
+  --ink:#3B322A; --ink2:#7A6C5D; --ink3:#9A8B79;
+  --line:#E9DFD1; --line2:#F4ECE0;
+  --olive:#8A9A6B; --brick:#C97A5E; --ochre:#C9A45A; --taupe:#B3A18C;
+  --olive-bg:#F0F3E8; --brick-bg:#FBF0EB; --ochre-bg:#FBF6E9;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.75 -apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:52px 24px 90px}
+
+.head{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:40px}
+.kicker{font:11px/1 var(--mono);letter-spacing:.16em;color:var(--olive);margin:0 0 14px;text-transform:uppercase}
+h1{font-size:28px;line-height:1.4;margin:0 0 12px;font-weight:600;letter-spacing:.01em}
+.sub{color:var(--ink2);font-size:14.5px;margin:0;max-width:640px}
+.meta{display:flex;gap:16px;flex-wrap:wrap;margin-top:16px;font:11px/1.8 var(--mono);color:var(--ink3)}
+
+section{margin:0 0 46px}
+h2{font-size:19px;margin:0 0 14px;font-weight:600;display:flex;align-items:baseline;gap:10px}
+h2 .no{font:11px/1 var(--mono);color:var(--olive);letter-spacing:.1em}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 14px;padding-left:20px}
+li{margin:0 0 6px}
+code{font-family:var(--mono);font-size:12.5px;background:var(--panel);padding:1px 5px;border-radius:3px}
+em{font-style:normal;color:var(--brick)}
+
+.decide{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 18px}
+@media(max-width:760px){.decide{grid-template-columns:1fr}}
+.d-card{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:16px 18px}
+.d-card h4{margin:0 0 8px;font-size:13.5px;font-weight:600}
+.d-card p{margin:0;font-size:13.5px;color:var(--ink2);line-height:1.7}
+
+/* ── 原型舞台 ── */
+.stage{display:flex;gap:34px;flex-wrap:wrap;justify-content:center;margin:24px 0 8px}
+.phone{width:352px;flex:0 0 auto}
+.screen{
+  height:668px;background:var(--bg);border:1px solid var(--line);border-radius:26px;
+  overflow:hidden;position:relative;display:flex;flex-direction:column;
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset;
+}
+.cap{font:11px/1.6 var(--mono);color:var(--ink3);margin:12px 2px 0;letter-spacing:.04em}
+
+/* 顶栏 */
+.top{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 16px 10px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:7px;font-size:15px}
+.brand .dot{width:7px;height:7px;border-radius:50%;background:var(--ink)}
+.today{font:10.5px/1 var(--mono);color:var(--ink3)}
+.close{font-size:12.5px;color:var(--ink3);background:none;border:none;padding:4px 0;cursor:pointer;font-family:inherit}
+
+/* 安排页 */
+.body{flex:1 1 auto;overflow-y:auto;padding:14px 16px 22px}
+.sec-title{font:11px/1 var(--mono);color:var(--ink3);letter-spacing:.1em;margin:0 0 10px;display:flex;justify-content:space-between}
+.sec-title b{font-weight:500;color:var(--ink2)}
+.group-title{font:11px/1 var(--mono);color:var(--ink3);letter-spacing:.1em;margin:22px 0 10px}
+
+.line-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 13px;margin:0 0 10px}
+.lc-top{display:flex;gap:10px;align-items:flex-start}
+.lc-cover{width:52px;height:52px;border-radius:7px;flex:0 0 auto;display:grid;place-items:center;
+  font-size:17px;color:var(--olive);background:var(--olive-bg);border:1px solid var(--line2)}
+.lc-name{font-size:15px;font-weight:600;line-height:1.45}
+.lc-meta{font:10.5px/1.6 var(--mono);color:var(--ink3);margin-top:1px}
+.lc-pair{font-size:13px;color:var(--brick);margin-top:6px}
+.lc-pair .arrow{color:var(--ink3);margin:0 4px}
+.lc-why{font-size:12.5px;color:var(--ink2);margin-top:4px;line-height:1.6}
+.lc-acts{display:flex;gap:8px;margin-top:11px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink2);font-size:12.5px;
+  padding:6px 11px;border-radius:7px;cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#FBF7EF}
+.btn.ghost{border-color:transparent;color:var(--ink3)}
+
+.plan-row{display:flex;align-items:center;gap:9px;padding:9px 2px;border-bottom:1px solid var(--line2);font-size:13.5px}
+.plan-row:last-child{border-bottom:none}
+.p-time{font:10.5px/1 var(--mono);color:var(--ink3);width:38px;flex:0 0 auto}
+.p-dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto}
+
+/* 浮层 */
+.sheet{position:absolute;inset:0;background:rgba(90,75,58,.26);display:none;align-items:flex-end;z-index:5}
+.sheet.open{display:flex}
+.panel{width:100%;max-height:88%;background:var(--bg);border:1px solid var(--line);
+  border-radius:14px 14px 0 0;display:flex;flex-direction:column;overflow:hidden;
+  animation:up .18s ease}
+@keyframes up{from{transform:translateY(12px);opacity:.4}to{transform:none;opacity:1}}
+.p-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:11px 15px;border-bottom:1px solid var(--line2)}
+.p-kicker{font:10.5px/1 var(--mono);color:var(--ink3);letter-spacing:.1em}
+.p-body{flex:1 1 auto;overflow-y:auto;padding:13px 15px 20px}
+
+.t-title{font-size:19px;font-weight:600;margin:2px 0 3px;line-height:1.4}
+.t-meta{font:10.5px/1.6 var(--mono);color:var(--ink3)}
+.t-why{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.65}
+
+.tabs{display:flex;gap:7px;margin:14px 0 4px}
+.tab{font-size:12.5px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;
+  background:transparent;color:var(--ink2);cursor:pointer;font-family:inherit}
+.tab.on{background:var(--ink);color:#FBF7EF;border-color:var(--ink)}
+
+.near{list-style:none;margin:10px 0 0;padding:0}
+.near li{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line2);cursor:pointer}
+.near li:last-child{border-bottom:none}
+.n-ico{width:26px;height:26px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;font-size:11px;
+  background:var(--olive-bg);color:var(--olive);border:1px solid var(--line2)}
+.n-ico.eat{background:var(--brick-bg);color:var(--brick)}
+.n-main{flex:1 1 auto;min-width:0}
+.n-name{font-size:14px;line-height:1.4}
+.n-sub{font-size:11.5px;color:var(--ink3);margin-top:2px;line-height:1.5}
+.n-walk{font:10.5px/1 var(--mono);color:var(--ink2);flex:0 0 auto}
+.n-go{font-size:15px;color:var(--line);flex:0 0 auto;margin-left:2px}
+.li-hidden{opacity:.42}
+.li-hidden .n-go{display:none}
+
+.degrade{background:var(--ochre-bg);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;
+  font-size:12px;color:var(--ink2);line-height:1.6;margin-top:10px}
+.empty{padding:22px 4px;text-align:center;color:var(--ink3);font-size:13px}
+.empty button{margin-top:10px}
+
+.p-foot{flex:0 0 auto;display:flex;gap:8px;padding:10px 15px 14px;border-top:1px solid var(--line2)}
+.p-foot .btn{flex:1 1 auto;text-align:center;padding:9px 0;font-size:13px}
+
+/* 日期条 */
+.days{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.day{font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:7px;background:var(--card);
+  color:var(--ink2);cursor:pointer;font-family:inherit}
+.day.on{background:var(--ink);color:#FBF7EF;border-color:var(--ink)}
+.toast{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);background:rgba(59,50,42,.92);
+  color:#FBF7EF;font-size:12px;padding:7px 14px;border-radius:999px;opacity:0;transition:opacity .2s;z-index:9;white-space:nowrap}
+.toast.on{opacity:1}
+
+/* 说明 */
+.notes{margin:22px 0 0;border-top:1px solid var(--line);padding-top:18px}
+.notes ol{padding-left:18px;margin:0}
+.notes li{font-size:13.5px;margin-bottom:8px;color:var(--ink2)}
+.notes b{color:var(--ink);font-weight:600}
+
+table{width:100%;border-collapse:collapse;margin:10px 0 18px;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:9px 10px;border-bottom:1px solid var(--line)}
+th{font:11px/1.6 var(--mono);color:var(--ink3);letter-spacing:.06em;font-weight:400;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:none}
+
+.callout{border-left:2px solid var(--ochre);background:var(--ochre-bg);padding:14px 16px;border-radius:0 3px 3px 0;margin:0 0 16px}
+.callout b{display:block;font:11px/1.6 var(--mono);letter-spacing:.06em;color:#A8853F;margin-bottom:5px}
+.callout p{margin:0;font-size:13.5px}
+.cut{border-left:2px solid var(--brick);background:var(--brick-bg);padding:14px 16px;border-radius:0 3px 3px 0}
+.cut b{display:block;font:11px/1.6 var(--mono);letter-spacing:.06em;color:var(--brick);margin-bottom:5px}
+.cut p{margin:0;font-size:13.5px}
+.foot{font:11px/1.8 var(--mono);color:var(--ink3);border-top:1px solid var(--line);padding-top:16px;margin-top:40px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="head">
+  <p class="kicker">selfsec · UI 设计 v1</p>
+  <h1>一个浮层，三个标签，换了锚点就换了答案</h1>
+  <p class="sub">这套 UI 只加了一个组件：地点浮层。餐厅、玩点、安排页的推荐线，点进去都是它；标签决定「想要什么」，锚点决定「从哪儿出发」。</p>
+  <div class="meta">
+    <span>承接 设计-地点拓扑-v3</span>
+    <span>原型可点：切标签 · 点邻居换锚点 · 安排这一天</span>
+    <span>示例数据，非线上</span>
+  </div>
+</div>
+
+<section>
+  <h2><span class="no">01</span> 我替你定下的两件事</h2>
+  <div class="decide">
+    <div class="d-card">
+      <h4>坐标：先用 OSM，缺的留空</h4>
+      <p>不为 10 家小馆子去注册高德 key、维护配额。查得到就写，查不到就让这家店降级成「同区」，卡面不写分钟——假精确比没数据更伤。真到一半都缺，再考虑换源。</p>
+    </div>
+    <div class="d-card">
+      <h4>玩点：补到 40 个再开工</h4>
+      <p>12 个点做不出「换一批」，推两周就重复。补点不用抓小红书，从你已有的收藏、`outing_spots` 种子、`date_visits` 里扩，一个人一下午的事，但它决定这套东西看起来像不像「有东西可推」。</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="no">02</span> 交互模型：三件事</h2>
+  <ul>
+    <li><b>标签是「意图」，不是页面。</b>「饭后走走 / 就近吃 / 雨天」对应同一个查询的三个参数，切标签不换页面、不重新加载，列表原地替换。</li>
+    <li><b>点邻居 = 换锚点。</b>这是整套设计里最重要的一个动作：点「天目里」不是跳到天目里的详情页，而是把这个浮层换成以天目里为中心——标题变了，列表变了，右上角多一句「← 湖滨步行街」。这就是「底层能力」在界面上的样子：同一个组件，换了中心就换了答案。</li>
+    <li><b>安排和不想去，都在浮层底部。</b>安排落两条计划（玩 + 吃），不想去只隐藏这一条邻居，不隐藏这个地点。</li>
+  </ul>
+  <div class="callout">
+    <b>为什么不做「地点详情页」</b>
+    <p>详情页会把地点变成一个终点。这里要的是通道：从任何一个地点出发，都能再走一步。所以浮层是连续的，不是层级式的——标题可换、可返回，但没有「下一页」。</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="no">03</span> 原型（可点）</h2>
+  <p style="font-size:13.5px;color:var(--ink2)">左边点任意一张卡 / 「看详情」打开浮层；浮层里切标签、点任意一行换锚点、点「安排这一天」选日期。</p>
+
+  <div class="stage">
+    <!-- ───────── 手机 1：安排页 ───────── -->
+    <div class="phone">
+      <div class="screen" id="scr1">
+        <div class="top">
+          <div class="brand"><span class="dot"></span><b>selfsec</b></div>
+          <button class="close" id="back-chat">关闭</button>
+        </div>
+        <div class="body">
+          <div class="sec-title"><b>这周去哪</b><span id="line-count">2 条线</span></div>
+          <div id="lines"></div>
+
+          <div class="group-title">今天</div>
+          <div class="plan-row"><span class="p-time">18:00</span><span class="p-dot" style="background:var(--olive)"></span><span>训练 · 背</span></div>
+          <div class="plan-row"><span class="p-time">19:30</span><span class="p-dot" style="background:var(--brick)"></span><span>吃饭 · 叶马茶楼</span></div>
+
+          <div class="group-title">本周</div>
+          <div class="plan-row"><span class="p-time">周二</span><span class="p-dot" style="background:var(--ochre)"></span><span>出门 · 湖滨步行街</span></div>
+        </div>
+        <div id="days1" style="display:none"></div>
+        <div class="toast" id="toast1">已安排 2 条：出门 + 吃饭</div>
+      </div>
+      <p class="cap">① 安排页 · 顶部推荐线，卡片可点开</p>
+    </div>
+
+    <!-- ───────── 手机 2：浮层 ───────── -->
+    <div class="phone">
+      <div class="screen" id="scr2">
+        <div class="top">
+          <div class="brand"><span class="dot"></span><b>selfsec</b></div>
+          <span class="today">安排</span>
+        </div>
+        <div class="body" style="opacity:.5">
+          <div class="sec-title"><b>这周去哪</b><span>2 条线</span></div>
+          <div id="lines2"></div>
+          <div class="group-title">今天</div>
+          <div class="plan-row"><span class="p-time">19:30</span><span class="p-dot" style="background:var(--brick)"></span><span>吃饭 · 叶马茶楼</span></div>
+        </div>
+
+        <div class="sheet open" id="sheet">
+          <div class="panel">
+            <div class="p-head">
+              <span class="p-kicker" id="p-kicker">地点</span>
+              <button class="close" id="p-back">返回</button>
+            </div>
+            <div class="p-body">
+              <div class="t-title" id="p-title">叶马茶楼</div>
+              <div class="t-meta" id="p-meta">上城区 · 江浙菜 · 人均 120 · 去过 1 次</div>
+              <div class="t-why" id="p-why">上榜理由：……</div>
+
+              <div class="tabs" id="tabs">
+                <button class="tab on" data-want="stroll">饭后走走</button>
+                <button class="tab" data-want="eat">就近吃</button>
+                <button class="tab" data-want="indoor">雨天</button>
+              </div>
+
+              <ul class="near" id="near"></ul>
+              <div id="degrade"></div>
+            </div>
+            <div class="p-foot">
+              <button class="btn primary" id="plan-btn">安排这一天</button>
+              <button class="btn" id="skip-btn">不想去</button>
+            </div>
+          </div>
+        </div>
+        <div class="toast" id="toast2">已安排 2 条：出门 + 吃饭</div>
+      </div>
+      <p class="cap">② 地点浮层 · 标签切意图，点行换锚点</p>
+    </div>
+  </div>
+
+  <div class="notes">
+    <ol>
+      <li><b>标签切换不跳页。</b>三个标签的数据一次取齐（一个请求就够），切换只是重排列表，没有 loading 态。</li>
+      <li><b>点一行 = 换中心。</b>标题、meta、列表同时换；「返回」回到上一个锚点。最多留 3 层，再深就回到入口。</li>
+      <li><b>「约 6 分钟」是算出来的。</b>直线距离 × 1.3 ÷ 80 米/分，取整到分钟；没坐标的地点排最后并标注「未取到坐标」，不写分钟。</li>
+      <li><b>距离超过 15 分钟的不出现。</b>不是排在后面——排在后面等于暗示「也还行」。真没有了就出空态，给一个「放宽到 20 分钟」的手动选项。</li>
+      <li><b>「不想去」只作用于这一行。</b>下次这个地点还在这家餐厅的列表里，但排到最后，不再推荐同一类（点第二次话固定隐藏）。</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <h2><span class="no">04</span> 三种状态怎么长</h2>
+  <table>
+    <thead><tr><th style="width:22%">状态</th><th>界面</th><th style="width:30%">为什么这样</th></tr></thead>
+    <tbody>
+      <tr><td>正常（有坐标）</td><td>名字 + 「约 6 分钟」+ 一句带信息的说明（街区 · 书店咖啡）</td><td>分钟数是这里唯一的硬信息，必须显眼</td></tr>
+      <tr><td>缺坐标</td><td>灰一点，写「同在西湖区 · 未取到坐标」，没有分钟，排最后</td><td>降级要看得出来，不能伪装成同等可信</td></tr>
+      <tr><td>配不到餐厅</td><td>推荐线卡片只写玩点，配对行写「附近还没配到合适的，先进门再说」</td><td>不让一条线因为缺一半而消失</td></tr>
+      <tr><td>空</td><td>「15 分钟内没找到」+ [放宽到 20 分钟]</td><td>空态给一个动作，别让人以为它在偷懒</td></tr>
+      <tr><td>已安排</td><td>浮层底部按钮变「已安排 · 周二」，可取消</td><td>避免同一件事安排两次</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2><span class="no">05</span> 前端要写多少</h2>
+  <table>
+    <thead><tr><th style="width:30%">文件</th><th>改动</th></tr></thead>
+    <tbody>
+      <tr><td><code>app.js</code></td><td>一个 <code>openPlace(id)</code> + 一个 <code>renderNearby()</code> + 一个锚点栈，约 90 行；安排按钮复用现有 <code>#schedule</code> 浮层</td></tr>
+      <tr><td><code>styles.css</code></td><td>浮层里的标签、邻居行、降级条，约 50 行；颜色全部用现有 token</td></tr>
+      <tr><td><code>index.html</code></td><td>不新增常驻 DOM（浮层复用 <code>.sheet</code>），只加版本号</td></tr>
+      <tr><td>安排页</td><td>仅在顶部插入「这周去哪」分组，现有分组不动</td></tr>
+    </tbody>
+  </table>
+  <div class="cut">
+    <b>不做</b>
+    <p>不做地图和导航跳转、不做地点详情页、不做月历、不做「分享这家店」、不在卡片里写「离你很近」。这五样任何一个进来，都会把这个浮层从通道变回终点。</p>
+  </div>
+</section>
+
+<div class="foot">
+  selfsec · UI 设计 v1 · 原型在 <code>docs/原型-地点浮层.html</code>，设计稿在 <code>docs/设计-地点拓扑-v3.html</code>
+</div>
+
+</div>
+
+<script>
+/* ────────────────────────────────────────────────
+   示例数据：杭州湖滨一带（坐标是估算，只为了让距离算出来合理）
+   ──────────────────────────────────────────────── */
+const PLACES = [
+  {id:'yema', name:'叶马茶楼', branch:'湖滨店', cat:'eat', area:'上城区', lat:30.2540, lng:120.1620,
+   attrs:{cuisine:'江浙菜', price:120, visits:1, tags:['江浙菜'], indoor:true},
+   why:'点评 4.7，人均 120，工作日晚上不用等位'},
+  {id:'hubin', name:'湖滨步行街', cat:'street', area:'上城区', lat:30.2555, lng:120.1640,
+   attrs:{tags:['街区','夜逛','平路'], indoor:false}, why:'沿湖走一段，傍晚光线最好'},
+  {id:'yujie', name:'南宋御街', cat:'street', area:'上城区', lat:30.2500, lng:120.1670,
+   attrs:{tags:['街区','小吃','夜逛'], indoor:false}, why:'晚上灯亮起来之后更好走'},
+  {id:'wushan', name:'吴山广场', cat:'park', area:'上城区', lat:30.2435, lng:120.1680,
+   attrs:{tags:['爬山','小吃'], indoor:false}, why:'上山看城隍阁，顺路吃小吃'},
+  {id:'xinbailu', name:'新白鹿', branch:'湖滨银泰店', cat:'eat', area:'上城区', lat:30.2570, lng:120.1580,
+   attrs:{cuisine:'杭帮菜', price:85, visits:0, tags:['杭帮菜'], indoor:true}, why:'便宜稳，人均 85'},
+  {id:'in77', name:'湖滨银泰 in77', cat:'shop', area:'上城区', lat:30.2560, lng:120.1610,
+   attrs:{tags:['商场','室内'], indoor:true}, why:'下雨也能待，负一层吃的多'},
+  {id:'nongtang', name:'弄堂里', cat:'eat', area:'上城区', lat:30.2520, lng:120.1690,
+   attrs:{cuisine:'杭帮菜', price:95, visits:2, tags:['杭帮菜'], indoor:true}, why:'人均 95，上菜快'},
+  {id:'laoyaji', name:'老鸭集', branch:'湖滨店', cat:'eat', area:'上城区', lat:null, lng:null,
+   attrs:{cuisine:'浙菜', price:95, visits:0, tags:['浙菜'], indoor:true}, why:'汤好，适合天冷'},
+];
+
+/* 步行分钟：同商场 2 分钟；否则 直线 × 1.3 ÷ 80 m/min；没坐标返回 null */
+function walkMin(a, b){
+  if(a.id === b.id) return 0;
+  if(!a.lat || !b.lat) return null;
+  const R=6371, rad=x=>x*Math.PI/180;
+  const dLat=rad(b.lat-a.lat), dLng=rad(b.lng-a.lng);
+  const h=Math.sin(dLat/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLng/2)**2;
+  const km = 2*R*Math.asin(Math.sqrt(h));
+  return Math.max(2, Math.round(km*1.3*1000/80));
+}
+
+const WANT = {
+  stroll:{ label:'饭后走走', ok:p => p.cat !== 'eat', fit:p => (p.attrs.tags||[]).some(t=>['街区','公园','平路','夜逛'].includes(t)) ? 1 : 0.5 },
+  eat:   { label:'就近吃',   ok:p => p.cat === 'eat',  fit:p => p.attrs.visits ? 0.5 : 1 },
+  indoor:{ label:'雨天',     ok:p => p.attrs.indoor,   fit:p => p.cat==='exhibit' ? 1 : 0.6 },
+};
+
+function nearby(anchorId, want, maxWalk=15){
+  const a = PLACES.find(p=>p.id===anchorId);
+  const w = WANT[want];
+  const out = [];
+  for(const p of PLACES){
+    if(p.id===a.id || !w.ok(p)) continue;
+    const m = walkMin(a,p);
+    if(m !== null && m > maxWalk) continue;
+    const near = m===null ? 0.15 : (m<=5?1: m<=10?0.8:0.5);
+    const score = 0.4*near + 0.3*w.fit(p) + 0.2*(p.attrs.visits?1:0) + 0.1*(p.area===a.area?0.5:0);
+    out.push({p, m, score});
+  }
+  out.sort((x,y)=> y.score-x.score || (x.m??99)-(y.m??99) || x.p.id.localeCompare(y.p.id));
+  return out;
+}
+
+/* ── 状态 ── */
+let anchor = 'yema', want = 'stroll', stack = [];
+const hidden = new Set();
+const $ = s => document.querySelector(s);
+
+/* ── 安排页的推荐线：两个 nearby 拼起来 ── */
+function renderLines(){
+  const plays = ['hubin','yujie'];
+  $('#lines').innerHTML = plays.map(id=>{
+    const play = PLACES.find(p=>p.id===id);
+    const eats = nearby(id,'eat',15);
+    const eat = eats.find(e=>e.p.cat==='eat');
+    const pair = eat
+      ? `晚饭吃 ${eat.p.name} <span class="arrow">·</span> 约 ${eat.m} 分钟`
+      : `附近还没配到合适的，先进门再说`;
+    return `<div class="line-card">
+      <div class="lc-top" data-open="${play.id}" style="cursor:pointer">
+        <div class="lc-cover">${play.name.slice(0,1)}</div>
+        <div style="min-width:0">
+          <div class="lc-name">${play.name}</div>
+          <div class="lc-meta">${play.area} · ${play.cat==='street'?'街区':play.cat}</div>
+          <div class="lc-pair">先去这里 <span class="arrow">→</span> ${pair}</div>
+          <div class="lc-why">${eat ? eat.p.why : play.why}</div>
+        </div>
+      </div>
+      <div class="lc-acts">
+        <button class="btn primary" data-plan="${play.id}">安排这一天</button>
+        <button class="btn" data-open="${play.id}">看详情</button>
+        <button class="btn ghost" data-hide-line="${play.id}">不想去</button>
+      </div>
+    </div>`;
+  }).join('');
+  $('#line-count').textContent = plays.length + ' 条线';
+  const mirror = $('#lines2');
+  if(mirror) mirror.innerHTML = $('#lines').innerHTML;
+}
+
+/* ── 浮层 ── */
+function openPlace(id, fromId){
+  if(fromId !== undefined) stack.push(anchor);
+  anchor = id; want = PLACES.find(p=>p.id===id).cat==='eat' ? 'stroll' : 'eat';
+  renderSheet();
+  $('#sheet').classList.add('open');
+}
+
+function metaOf(p){
+  const bits = [p.area];
+  if(p.cat === 'eat'){
+    if(p.attrs.cuisine) bits.push(p.attrs.cuisine);
+    if(p.attrs.price) bits.push('人均 ' + p.attrs.price);
+    bits.push(p.attrs.visits ? '去过 ' + p.attrs.visits + ' 次' : '没去过');
+  } else {
+    const tags = (p.attrs.tags || []).slice(0, 2);
+    if(tags.length) bits.push(tags.join(' · '));
+    if(p.attrs.indoor) bits.push('室内');
+  }
+  return bits.join(' · ');
+}
+
+function renderSheet(){
+  const a = PLACES.find(p=>p.id===anchor);
+  $('#p-kicker').textContent = a.cat === 'eat' ? '餐厅' : '地点';
+  $('#p-title').textContent = a.name;
+  $('#p-meta').textContent = metaOf(a);
+  $('#p-why').textContent = a.why || '';
+  $('#p-back').textContent = stack.length ? '← ' + PLACES.find(p=>p.id===stack[stack.length-1]).name : '关闭';
+
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.dataset.want===want));
+
+  const rows = nearby(anchor, want).filter(r=>!hidden.has(r.p.id));
+  const icon = p => p.cat==='eat' ? '吃' : p.cat==='park' ? '园' : p.cat==='shop' ? '商' : p.cat==='exhibit' ? '展' : '逛';
+  $('#near').innerHTML = rows.map(r=>{
+    const sub = r.m===null
+      ? `同在${r.p.area} · 未取到坐标`
+      : `${r.p.attrs.tags ? r.p.attrs.tags[0] : ''} · ${r.p.why || ''}`;
+    return `<li data-goto="${r.p.id}" class="${r.m===null?'degraded':''}" style="${r.m===null?'opacity:.6':''}">
+      <span class="n-ico ${r.p.cat==='eat'?'eat':''}">${icon(r.p)}</span>
+      <span class="n-main">
+        <span class="n-name">${r.p.name}</span>
+        <span class="n-sub">${sub}</span>
+      </span>
+      <span class="n-walk">${r.m===null?'—':'约 '+r.m+' 分钟'}</span>
+      <span class="n-go">›</span>
+    </li>`;
+  }).join('');
+
+  const degrade = rows.filter(r=>r.m===null).length;
+  $('#degrade').innerHTML = rows.length === 0
+    ? `<div class="empty">15 分钟内没找到合适的
+         <div><button class="btn" id="widen">放宽到 20 分钟</button></div></div>`
+    : (degrade ? `<div class="degrade">还有 ${degrade} 个地点没取到坐标，只能按区域判断，排在最后。</div>` : '');
+  const wid = $('#widen'); if(wid) wid.onclick = ()=>{ want='stroll'; renderSheet(); };
+}
+
+/* ── 事件 ── */
+document.addEventListener('click', e=>{
+  const t = e.target.closest('[data-open],[data-plan],[data-goto],[data-want],[data-hide-line]');
+  if(!t) return;
+
+  if(t.dataset.open) return openPlace(t.dataset.open);
+  if(t.dataset.want){ want = t.dataset.want; renderSheet(); return; }
+  if(t.dataset.goto){ openPlace(t.dataset.goto, true); return; }
+
+  if(t.dataset.hideLine){ t.closest('.line-card').style.display='none'; return; }
+
+  if(t.dataset.plan){
+    $('#toast1').classList.add('on');
+    setTimeout(()=>$('#toast1').classList.remove('on'), 1600);
+  }
+});
+
+$('#p-back').onclick = ()=>{
+  if(stack.length){ anchor = stack.pop(); renderSheet(); }
+  else $('#sheet').classList.remove('open');
+};
+$('#sheet').onclick = e=>{ if(e.target.id==='sheet') $('#sheet').classList.remove('open'); };
+$('#plan-btn').onclick = ()=>{
+  $('#toast2').classList.add('on');
+  setTimeout(()=>$('#toast2').classList.remove('on'), 1600);
+};
+$('#skip-btn').onclick = ()=>{
+  const first = document.querySelector('#near li[data-goto]');
+  if(!first) return;
+  hidden.add(first.dataset.goto);
+  renderSheet();
+  $('#toast2').textContent = '这条不再推荐，重开列表也不会排在前面';
+  $('#toast2').classList.add('on');
+  setTimeout(()=>{
+    $('#toast2').classList.remove('on');
+    setTimeout(()=>{ $('#toast2').textContent = '已安排 2 条：出门 + 吃饭'; }, 220);
+  }, 1600);
+};
+
+renderLines(); renderSheet();
+</script>
+</body>
+</html>

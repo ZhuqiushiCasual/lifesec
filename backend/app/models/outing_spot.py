@@ -31,4 +31,7 @@ class OutingSpot(Base):
     sort: Mapped[int] = mapped_column(default=0, nullable=False, index=True)
     hidden: Mapped[bool] = mapped_column(default=False, nullable=False)
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="seed")
+    place_id: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True, index=True, comment="places.id（由 place.sync_from_domain 回填）"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local)

@@ -42,3 +42,6 @@ scripts/xhs_photos/profile/
 scripts/xhs_photos/out/
 scripts/xhs_photos/cand/
 scripts/xhs_photos/discover/
+
+# 地点地理编码缓存（可重跑生成，不入库）；偏移量 geo_offset.json 要入库
+backend/data/geo_cache.json

@@ -70,5 +70,10 @@ class DateMenuItem(Base):
     sort: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True, comment="展示顺序，越小越靠前")
     hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, comment="隐藏（前台不出现，后台仍可见）")
 
+    # 拓扑入口：指向 places。拓扑查询只读 places，这里只是「我是哪家店」的锚
+    place_id: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True, index=True, comment="places.id（由 place.sync_from_domain 回填）"
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local)
     updated_at: Mapped[datetime] = mapped_column(DateTimeMicro, default=now_local, onupdate=now_local)

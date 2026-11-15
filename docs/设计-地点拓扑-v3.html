@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>设计稿 v3：地点只有一个表 · 邻居只有一个查询</title>
+<style>
+:root{
+  --bg:#FAF5EC; --panel:#F5EEE2; --card:#FFFDF8;
+  --ink:#3B322A; --ink2:#6F6255; --ink3:#9A8B79;
+  --line:#E7DCCB; --line2:#DCCFBB;
+  --olive:#6F7F4E; --brick:#A9614A; --ochre:#B98A3E; --slate:#5C6B78;
+  --olive-bg:#EEF1E4; --brick-bg:#F8ECE7; --ochre-bg:#F8F0DF;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-feature-settings:"palt" 1;
+  letter-spacing:.01em;
+}
+.wrap{max-width:880px;margin:0 auto;padding:56px 28px 96px}
+
+/* ── 页眉 ── */
+.head{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:44px}
+.kicker{font-size:12.5px;letter-spacing:.18em;color:var(--olive);text-transform:uppercase;margin:0 0 14px}
+h1{font-size:31px;line-height:1.35;margin:0 0 14px;font-weight:600;letter-spacing:.01em}
+.sub{color:var(--ink2);font-size:15.5px;margin:0}
+.meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:18px;font-size:13px;color:var(--ink3)}
+.meta b{color:var(--ink2);font-weight:500}
+
+/* ── 章节 ── */
+section{margin:0 0 52px}
+h2{font-size:21px;margin:0 0 18px;font-weight:600;display:flex;align-items:baseline;gap:12px}
+h2 .no{font-size:13px;color:var(--olive);letter-spacing:.1em;font-variant-numeric:tabular-nums;font-weight:500}
+h3{font-size:16px;margin:28px 0 10px;font-weight:600;color:var(--ink)}
+p{margin:0 0 14px}
+ul,ol{margin:0 0 16px;padding-left:22px}
+li{margin:0 0 8px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;background:var(--panel);padding:2px 6px;border-radius:4px}
+em{font-style:normal;color:var(--brick);font-weight:500}
+small{font-size:13px;color:var(--ink3)}
+
+/* ── 核心结论卡 ── */
+.claim{
+  background:var(--card);border:1px solid var(--line2);border-radius:3px;
+  padding:26px 28px;margin:0 0 26px;
+}
+.claim p{margin:0 0 10px;font-size:17px}
+.claim p:last-child{margin:0}
+.claim .big{font-size:20px;line-height:1.6}
+.hl{background:linear-gradient(transparent 62%, #E8EBD8 62%);padding:0 2px}
+
+/* ── 表格 ── */
+table{width:100%;border-collapse:collapse;margin:14px 0 22px;font-size:14.5px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--ink2);font-weight:500;font-size:13px;letter-spacing:.04em;border-bottom:1px solid var(--line2)}
+td code{font-size:12.5px}
+tr:last-child td{border-bottom:none}
+.tbl-note{font-size:13px;color:var(--ink3);margin-top:-12px}
+
+/* ── 取舍块 ── */
+.tradeoff{border-left:2px solid var(--ochre);background:var(--ochre-bg);padding:16px 20px;margin:0 0 20px;border-radius:0 3px 3px 0}
+.tradeoff b{display:block;font-size:13px;letter-spacing:.06em;color:var(--ochre);margin-bottom:6px}
+.tradeoff p{margin:0;font-size:14.5px;color:var(--ink)}
+
+.cut{border-left:2px solid var(--brick);background:var(--brick-bg);padding:16px 20px;margin:0 0 20px;border-radius:0 3px 3px 0}
+.cut b{display:block;font-size:13px;letter-spacing:.06em;color:var(--brick);margin-bottom:6px}
+.cut p{margin:0 0 6px;font-size:14.5px}
+.cut p:last-child{margin:0}
+
+.keep{border-left:2px solid var(--olive);background:var(--olive-bg);padding:16px 20px;margin:0 0 20px;border-radius:0 3px 3px 0}
+.keep b{display:block;font-size:13px;letter-spacing:.06em;color:var(--olive);margin-bottom:6px}
+.keep p{margin:0 0 6px;font-size:14.5px}
+.keep p:last-child{margin:0}
+
+/* ── 代码 ── */
+pre{
+  background:var(--card);border:1px solid var(--line);border-radius:3px;
+  padding:18px 20px;overflow-x:auto;margin:0 0 20px;
+  font:13px/1.75 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink);
+}
+pre .c{color:var(--ink3)}
+pre .k{color:var(--brick)}
+pre .f{color:var(--olive)}
+pre .s{color:var(--slate)}
+
+/* ── 图 ── */
+figure{margin:0 0 24px}
+figure svg{width:100%;height:auto;display:block;background:var(--card);border:1px solid var(--line);border-radius:3px}
+figcaption{font-size:13px;color:var(--ink3);margin-top:10px;text-align:center}
+
+/* ── 两栏对比 ── */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:0 0 22px}
+@media(max-width:700px){.cols{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:18px 20px}
+.card h4{margin:0 0 10px;font-size:14px;letter-spacing:.04em;color:var(--ink2);font-weight:500}
+.card ul{margin:0;padding-left:18px;font-size:14px}
+.card li{margin-bottom:6px}
+
+/* ── 步骤 ── */
+.steps{counter-reset:s;list-style:none;padding:0;margin:0 0 20px}
+.steps li{counter-increment:s;position:relative;padding-left:38px;margin:0 0 14px;font-size:15px}
+.steps li::before{
+  content:counter(s);position:absolute;left:0;top:2px;
+  width:22px;height:22px;border:1px solid var(--line2);border-radius:50%;
+  font-size:11.5px;color:var(--olive);display:grid;place-items:center;font-variant-numeric:tabular-nums;
+}
+
+/* ── 待定 ── */
+.open{background:var(--panel);border:1px dashed var(--line2);border-radius:3px;padding:22px 24px}
+.open ol{margin:0;padding-left:20px}
+.open li{margin-bottom:10px;font-size:14.5px}
+.open li:last-child{margin-bottom:0}
+
+hr.sep{border:none;border-top:1px solid var(--line);margin:48px 0}
+.foot{font-size:13px;color:var(--ink3);border-top:1px solid var(--line);padding-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ══════════════ 页眉 ══════════════ -->
+<div class="head">
+  <p class="kicker">selfsec · 设计稿 v3</p>
+  <h1>地点只有一个表，邻居只有一个查询</h1>
+  <p class="sub">用你的三条原则 review 上一版：能算出来的东西不要存；一个能力不要长出两个方向；元数据长一格，关系就多一层。</p>
+  <div class="meta">
+    <span><b>状态</b> 设计稿，未开发</span>
+    <span><b>承接</b> 设计-推荐线.md → 设计-地点拓扑-v2.md → 本稿</span>
+    <span><b>新增持久化</b> 一张表</span>
+    <span><b>新增查询</b> 一个函数</span>
+  </div>
+</div>
+
+<!-- ══════════════ 0 结论 ══════════════ -->
+<section>
+  <div class="claim">
+    <p class="big">整件事收敛成 <span class="hl">一张 <code>places</code> 表 + 一个 <code>nearby(anchor, want)</code> 函数</span>。</p>
+    <p>餐厅和玩点是同一张表里 <code>category</code> 的两个取值，不是两种东西。所以「餐厅 → 餐后闲逛」和「玩点 → 就近吃」是<em>同一行代码</em>，只是 <code>want</code> 不同——我上一版还留着一个「方向」的概念，那是多余的。</p>
+    <p>地点之间的距离、同商场、同地铁、同一篇笔记提到过，全部<em>在查询时算</em>，不落库。<br>
+    拓扑不是存下来的图，是节点属性算出来的结果。属性可扩展，拓扑就自动长大。</p>
+  </div>
+
+  <div class="keep">
+    <b>这一版没有的东西</b>
+    <p>没有图数据库，没有边表（<code>place_edges</code>），没有意图配置表，没有配方反馈表，没有重算任务，没有人工置边，没有模型调用。</p>
+  </div>
+</section>
+
+<!-- ══════════════ 1 review ══════════════ -->
+<section>
+  <h2><span class="no">01</span> 用你的思路 review 上一版</h2>
+  <p>你的判断是：<em>越简洁越好维护，也越强大</em>。拿这条尺子量 v2，有五处是我自己加出来的复杂度。</p>
+
+  <table>
+    <thead><tr><th style="width:23%">v2 的做法</th><th style="width:34%">问题</th><th>这一版</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>place_edges</code> 边表</td>
+        <td>距离、同商场、同区域都能算出来，存进去就要同步、要重算、要处理「人工边不被覆盖」。<br>为可计算的东西建存储，是纯负担。</td>
+        <td>边全部在查询时算。步行分钟 = 直线距离 × 1.3 ÷ 80 米/分；同 <code>parent_place_id</code> 一律按 2 分钟。</td>
+      </tr>
+      <tr>
+        <td>四层架构（节点 / 关系 / 意图 / 配方）</td>
+        <td>层是给不同变更频率的东西划边界用的。这里节点和数据一起变，配方只是一个函数，硬划四层让图好看，代码并不会变好懂。</td>
+        <td>两个东西：<b>数据</b>（places）和<b>查询</b>（nearby）。配方是调用查询的一段组合逻辑，写在一个文件里。</td>
+      </tr>
+      <tr>
+        <td>「方向」：<code>recipe(line)</code> vs <code>recipe(stroll)</code></td>
+        <td>方向是组合层面的说法，不是数据结构里的说法。有方向就会出现两套代码、两套测试、两份文案。</td>
+        <td><b>没有方向。</b>只有一个 <code>want</code> 参数（想吃 / 想逛 / 想室内）。两个场景共用同一个函数与同一段理由模板。</td>
+      </tr>
+      <tr>
+        <td>意图配置表 / 配方注册表</td>
+        <td>现在只有 3 个意图。配置表是给「运行时要改」的东西准备的，这里改代码更快、更可读，还能被 IDE 和测试覆盖。</td>
+        <td>3 个 <code>want</code> 写成一个字典常量，等真到 10 个再抽象。</td>
+      </tr>
+      <tr>
+        <td><code>recipe_feedback</code> 表</td>
+        <td>「不想去」现有两张表已经有 <code>hidden</code> 字段，再建一张表是为了记录一个布尔值。</td>
+        <td>直接复用 <code>hidden</code>。降权、收藏这类信号等有真实行为数据再说。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="tradeoff">
+    <b>拆掉之后付出的代价，我承认</b>
+    <p>① 每次请求都重算邻居（39 个节点，一次全表 + 一次排序，毫秒级，可接受）；② 距离是估算，街上绕路会让「约 6 分钟」有误差（卡面写「约」，不写「6 分钟」）；③ 没有人工置边，配错了只能改坐标或分类，不能手工「我知道这两个近」。第三条是唯一真实损失，我认为在几十个点的规模上不值得为它建一张表。</p>
+  </div>
+</section>
+
+<!-- ══════════════ 2 模型 ══════════════ -->
+<section>
+  <h2><span class="no">02</span> 数据：一张表装下所有地点</h2>
+
+  <p>餐厅和玩点的差别，几乎全是<em>属性</em>的差别，不是<em>结构</em>的差别：人均、菜系、口味；门票、耗时、适合季节。既然要「元数据可不断拓展」，那就别让这些差异长成列，而是一起装进一个可扩展的 JSON。</p>
+
+  <pre><span class="c">-- 新表，只此一张</span>
+<span class="k">places</span>
+  id               uuid pk
+  canonical_key    varchar unique   <span class="c">-- 规范化(名+分店)，回填脚本靠它幂等</span>
+  name             varchar(120)
+  branch           varchar(80)
+  <span class="f">category</span>         varchar(16)      <span class="c">-- eat / play / shop / park / exhibit / street</span>
+  area             varchar(40)
+  address          varchar(255)
+  <span class="f">lng, lat</span>         double null      <span class="c">-- 可空：查不到就不假装有</span>
+  metro_station    varchar(80)
+  metro_walk_m     int
+  parent_place_id  uuid null        <span class="c">-- 商场里的店 → 指向商场节点</span>
+  <span class="f">attrs            json</span>            <span class="c">-- 所有差异字段都在这，加属性不改表</span>
+  hidden           bool default 0
+  created_at, updated_at</pre>
+
+  <p><code>attrs</code> 现在装的东西（以后只加键，不改表）：</p>
+  <pre>{
+  <span class="s">"tags"</span>: [<span class="s">"街区"</span>, <span class="s">"书店"</span>, <span class="s">"咖啡"</span>],
+  <span class="s">"indoor"</span>: true,
+  <span class="s">"open_till"</span>: <span class="s">"22:00"</span>,
+  <span class="s">"duration_min"</span>: 90,
+  <span class="s">"cuisine"</span>: <span class="s">"江浙菜"</span>, <span class="s">"price"</span>: 120, <span class="s">"score"</span>: 4.7,
+  <span class="s">"taste"</span>: [4, 0, 2],
+  <span class="s">"walk_grade"</span>: <span class="s">"平路"</span>
+}</pre>
+
+  <h3>为什么不再合并 <code>date_menu</code> / <code>outing_spots</code></h3>
+  <p>这是唯一一个我<em>主动选择不做</em>的简化。合并成一张表在模型上更干净，但它会牵动 11 个后台接口、挑餐厅页、照片表的 <code>restaurant_id</code>、以及 <code>plans.ref_type</code> 里两种取值——这是一次纯重构，收益是「少两张表」，风险是打断一个已经在用的功能。</p>
+  <p>所以我选中间态：<b>places 是拓扑的唯一入口，领域表保留自己的业务字段，加一列 <code>place_id</code> 挂上来</b>。删除旧表这件事，等哪天要重写挑餐厅页时顺手做。</p>
+
+  <table>
+    <thead><tr><th>表</th><th>管什么</th><th>变化</th></tr></thead>
+    <tbody>
+      <tr><td><code>places</code></td><td>在哪、是什么、有哪些属性、和谁同一个 parent</td><td>新增</td></tr>
+      <tr><td><code>date_menu</code></td><td>菜单顺序、口味三轴、点菜避坑、实拍图</td><td>加 <code>place_id</code></td></tr>
+      <tr><td><code>outing_spots</code></td><td>候选顺序、一句提示</td><td>加 <code>place_id</code></td></tr>
+      <tr><td><code>plans</code></td><td>安排落库</td><td>不动（<code>ref_type</code> 仍是 date_menu / outing_spot）</td></tr>
+      <tr><td><code>date_photos</code></td><td>实拍图集</td><td>不动</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════ 3 拓扑是算出来的 ══════════════ -->
+<section>
+  <h2><span class="no">03</span> 拓扑：边是算出来的，不是存起来的</h2>
+
+  <figure>
+    <svg viewBox="0 0 760 340" role="img" aria-label="地点拓扑示意">
+      <!-- edges -->
+      <g stroke="#CFC2AC" stroke-width="1.2" fill="none">
+        <line x1="140" y1="190" x2="330" y2="110"/>
+        <line x1="140" y1="190" x2="330" y2="262"/>
+        <line x1="330" y1="110" x2="520" y2="180"/>
+        <line x1="330" y1="262" x2="520" y2="180"/>
+        <line x1="520" y1="180" x2="660" y2="96"/>
+      </g>
+      <!-- edge labels -->
+      <g font-size="11.5" fill="#9A8B79" font-family="-apple-system,'PingFang SC',sans-serif">
+        <text x="205" y="136">约 6 分钟</text>
+        <text x="205" y="248">约 12 分钟</text>
+        <text x="404" y="132">约 8 分钟</text>
+        <text x="404" y="244">约 9 分钟</text>
+        <text x="572" y="122">约 10 分钟</text>
+      </g>
+      <!-- nodes -->
+      <g font-family="-apple-system,'PingFang SC',sans-serif">
+        <!-- eat -->
+        <circle cx="140" cy="190" r="27" fill="#F8ECE7" stroke="#A9614A" stroke-width="1.2"/>
+        <text x="140" y="187" text-anchor="middle" font-size="11" fill="#A9614A">eat</text>
+        <text x="140" y="201" text-anchor="middle" font-size="10" fill="#B08A7E">餐厅</text>
+        <text x="140" y="245" text-anchor="middle" font-size="13" fill="#3B322A">叶马茶楼</text>
+
+        <!-- play -->
+        <circle cx="330" cy="110" r="27" fill="#EEF1E4" stroke="#6F7F4E" stroke-width="1.2"/>
+        <text x="330" y="107" text-anchor="middle" font-size="11" fill="#6F7F4E">play</text>
+        <text x="330" y="121" text-anchor="middle" font-size="10" fill="#94A175">街区</text>
+        <text x="330" y="64" text-anchor="middle" font-size="13" fill="#3B322A">天目里</text>
+
+        <circle cx="330" cy="262" r="27" fill="#EEF1E4" stroke="#6F7F4E" stroke-width="1.2"/>
+        <text x="330" y="259" text-anchor="middle" font-size="11" fill="#6F7F4E">play</text>
+        <text x="330" y="273" text-anchor="middle" font-size="10" fill="#94A175">校园</text>
+        <text x="330" y="316" text-anchor="middle" font-size="13" fill="#3B322A">美院象山</text>
+
+        <!-- eat -->
+        <circle cx="520" cy="180" r="27" fill="#F8ECE7" stroke="#A9614A" stroke-width="1.2"/>
+        <text x="520" y="177" text-anchor="middle" font-size="11" fill="#A9614A">eat</text>
+        <text x="520" y="191" text-anchor="middle" font-size="10" fill="#B08A7E">餐厅</text>
+        <text x="520" y="235" text-anchor="middle" font-size="13" fill="#3B322A">新白鹿</text>
+
+        <!-- park -->
+        <circle cx="660" cy="96" r="27" fill="#EEF1E4" stroke="#6F7F4E" stroke-width="1.2"/>
+        <text x="660" y="93" text-anchor="middle" font-size="11" fill="#6F7F4E">park</text>
+        <text x="660" y="107" text-anchor="middle" font-size="10" fill="#94A175">湖</text>
+        <text x="660" y="50" text-anchor="middle" font-size="13" fill="#3B322A">西湖</text>
+      </g>
+      <!-- anchor highlight -->
+      <circle cx="140" cy="190" r="35" fill="none" stroke="#A9614A" stroke-width="1" stroke-dasharray="3 4" opacity=".7"/>
+      <text x="140" y="285" text-anchor="middle" font-size="11" fill="#9A8B79">锚点</text>
+    </svg>
+    <figcaption>没有一条边被存进数据库。所有连线都是 <code>haversine(坐标)</code> 现算出来的，锚点换了，连线的顺序就换了。</figcaption>
+  </figure>
+
+  <h3>算距离，只需要三个分支</h3>
+  <pre><span class="k">def</span> <span class="f">walk_minutes</span>(a, b):
+    <span class="k">if</span> a.id == b.id: <span class="k">return</span> 0
+    <span class="k">if</span> a.parent_place_id <span class="k">and</span> a.parent_place_id == b.parent_place_id:
+        <span class="k">return</span> 2                      <span class="c"># 同一个商场：不按坐标算，否则会得出「相距 0 米」</span>
+    <span class="k">if</span> a.lng <span class="k">and</span> b.lng:
+        <span class="k">return</span> <span class="f">round</span>(haversine_km(a, b) * 1.3 * 1000 / 80)   <span class="c"># 绕路系数 1.3，步速 80 m/min</span>
+    <span class="k">return</span> <span class="k">None</span>                       <span class="c"># 没有坐标：不进候选，不编距离</span></pre>
+
+  <h3>属性长一格，拓扑就多一层</h3>
+  <p>这是「元数据形成拓扑」真正落地的地方：<b>不需要写迁移，也不需要重算任何东西，新属性下次查询就生效</b>。</p>
+  <table>
+    <thead><tr><th style="width:26%">新加的元数据</th><th>自动多出来的关系</th><th>用在哪</th></tr></thead>
+    <tbody>
+      <tr><td><code>attrs.indoor</code></td><td>「雨天能去哪」</td><td>下雨的周末推室内候选，室外自动降权</td></tr>
+      <tr><td><code>attrs.open_till</code></td><td>「晚上十点后还能去哪」</td><td>吃完饭 21:30 找地方坐，过滤掉已关门的</td></tr>
+      <tr><td><code>metro_station</code></td><td>「同站直达」</td><td>两站之间不用打车，同站换乘等于 0 距离</td></tr>
+      <tr><td><code>parent_place_id</code></td><td>「同一栋楼里」</td><td>商场里的店 / 餐厅，都在 2 分钟半径内</td></tr>
+      <tr><td><code>attrs.duration_min</code></td><td>「够不够时间」</td><td>下午 3 点出门，排得下 90 分钟的展，排不下半天</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════ 4 一个查询 ══════════════ -->
+<section>
+  <h2><span class="no">04</span> 查询：一个函数，没有方向</h2>
+
+  <p>你说得对——餐厅到闲逛、闲逛到餐厅，在底层是同一件事。<b>锚点是一个地点，<code>want</code> 是候选的类别</b>，这两个参数已经够描述所有方向：</p>
+
+  <pre><span class="k">async def</span> <span class="f">nearby</span>(db, anchor_id, want=<span class="k">None</span>, max_walk=15, limit=5):
+    <span class="c">"""以 anchor 为中心，返回走得动、符合 want 的邻居。唯一的推荐入口。"""</span>
+    anchor = <span class="k">await</span> get_place(db, anchor_id)
+    rows = <span class="k">await</span> db.scalars(<span class="f">select</span>(Place).where(Place.hidden.is_(<span class="k">False</span>)))
+    out = []
+    <span class="k">for</span> p <span class="k">in</span> rows:
+        <span class="k">if</span> p.id == anchor.id: <span class="k">continue</span>
+        <span class="k">if</span> want <span class="k">and</span> p.category != want: <span class="k">continue</span>
+        m = <span class="f">walk_minutes</span>(anchor, p)
+        <span class="k">if</span> m <span class="k">is</span> <span class="k">None</span> <span class="k">or</span> m > max_walk: <span class="k">continue</span>
+        out.append({<span class="s">"place"</span>: p, <span class="s">"walk"</span>: m, <span class="s">"score"</span>: <span class="f">score</span>(anchor, p, m, want)})
+    out.sort(key=<span class="k">lambda</span> x: (-x[<span class="s">"score"</span>], x[<span class="s">"walk"</span>], x[<span class="s">"place"</span>].id))
+    <span class="k">return</span> out[:limit]</pre>
+
+  <div class="cols">
+    <div class="card">
+      <h4>餐厅 → 餐后闲逛</h4>
+      <pre style="border:none;padding:0;margin:0;background:transparent">nearby(
+  anchor_id=<span class="s">"叶马茶楼"</span>,
+  want=<span class="s">"play"</span>
+)</pre>
+      <p style="font-size:13.5px;color:#6F6255;margin:12px 0 0">→ 天目里 约 6 分钟<br>→ 美院象山 约 12 分钟</p>
+    </div>
+    <div class="card">
+      <h4>玩点 → 就近吃</h4>
+      <pre style="border:none;padding:0;margin:0;background:transparent">nearby(
+  anchor_id=<span class="s">"天目里"</span>,
+  want=<span class="s">"eat"</span>
+)</pre>
+      <p style="font-size:13.5px;color:#6F6255;margin:12px 0 0">→ 叶马茶楼 约 6 分钟<br>→ 新白鹿 约 8 分钟</p>
+    </div>
+  </div>
+
+  <p>同一段代码、同一套打分、同一个理由模板。区别只在 UI 上默认选中哪个 <code>want</code> 标签——那是界面的事，不是数据的事。</p>
+
+  <h3>打分：四项，可解释，可复现</h3>
+  <pre>score = 0.40 * near + 0.30 * fit + 0.20 * habit + 0.10 * area
+
+near   = 1.0 (&le;5 min) / 0.8 (5–10) / 0.5 (10–15) / 0.9 (同商场)
+fit    = want 要求的 attrs 命中率，<span class="c">如「逛」要 街区/公园/书店/平路</span>
+habit  = 去过 +1，没去过 0（熟悉的先来，避免每次都推没去过的）
+area   = 同区 0.5，跨区 0</pre>
+
+  <p>排序键固定为 <code>score desc, walk asc, id asc</code>——同分不抖，测试可断言。<b>全程不调模型</b>：模型只用来补 <code>attrs</code>（这座公园要不要爬坡、这家店几点关门），不参与排序。</p>
+
+  <h3>理由句是拼出来的</h3>
+  <p>每个候选必须能说清「凭什么」，否则不展示：</p>
+  <pre><span class="c"># 模板：从 {anchor} 走 {m} 分钟到 {name}，{tags[0]}，{一句来自 attrs 的说明}</span>
+<span class="s">"从叶马茶楼走约 6 分钟到天目里，街区，书店和咖啡都在里面"</span>
+<span class="s">"从西湖走约 10 分钟到新白鹿，江浙菜，人均 90 的那家"</span></pre>
+  <p>缺字段就少写一段；写不出具体信息的候选直接不出现，<em>绝不出现「离你很近」「环境不错」</em>。</p>
+</section>
+
+<!-- ══════════════ 5 上层 ══════════════ -->
+<section>
+  <h2><span class="no">05</span> 上层：推荐线是两个 nearby 拼起来的</h2>
+
+  <p>上一版的「配方层」在这里没有位置——它不是一个层，就是一段十行的组合逻辑：</p>
+
+  <pre><span class="k">async def</span> <span class="f">line</span>(db, play_id):
+    play = <span class="k">await</span> get_place(db, play_id)
+    eats = <span class="k">await</span> <span class="f">nearby</span>(db, play_id, want=<span class="s">"eat"</span>, max_walk=15, limit=3)
+    <span class="k">if not</span> eats: <span class="k">return</span> {<span class="s">"play"</span>: play, <span class="s">"eat"</span>: <span class="k">None</span>}   <span class="c"># 没配到餐厅，照样能安排出门</span>
+    <span class="k">return</span> {<span class="s">"play"</span>: play, <span class="s">"eat"</span>: eats[0][<span class="s">"place"</span>]}</pre>
+
+  <p>以后要「一天三段」「雨天备选」「带爸妈」，都是在这一层再写一个函数，底层不动。反过来，底层加一个 <code>attrs</code> 键，上面所有组合自动变聪明。</p>
+
+  <div class="cut">
+    <b>不落 <code>outing_lines</code> 表</b>
+    <p>它是计算结果。「安排」落 <code>plans</code>（现有接口，幂等），「不想去」写 <code>hidden</code>（现有字段）。派生结果不建表，就不会有状态对不齐的问题——上一版把「不想去」记在线上，线重算后 id 变了，状态就失联了。</p>
+  </div>
+</section>
+
+<!-- ══════════════ 6 界面 ══════════════ -->
+<section>
+  <h2><span class="no">06</span> 界面：一个浮层，一组标签</h2>
+
+  <p>现在「这个地点周围有什么」这件事，在挑餐厅页、安排页、<code>#experience</code> 浮层各写了一遍。收敛成<em>一个组件</em>，所有入口都调到同一个地方：</p>
+
+  <pre>┌ 叶马茶楼 ────────────────────────────── × ┐
+│ [实拍]  西湖区 · 江浙菜 · 人均 120          │
+│ 上榜理由：…………………………………………      │
+│                                            │
+│  [饭后走走] [就近吃] [雨天室内]              │  ← 标签 = want，默认选哪个由入口决定
+│ ────────────────────────────────────────── │
+│  天目里        约 6 分钟 · 街区 · 书店咖啡    │
+│  美院象山      约 12 分钟 · 校园建筑         │
+│ ────────────────────────────────────────── │
+│  [安排这一天]        [不想去]                │
+└────────────────────────────────────────────┘</pre>
+
+  <ul>
+    <li>餐厅详情默认选中「饭后走走」，玩点详情默认「就近吃」，其余完全一样；</li>
+    <li>「安排这一天」落到现有 <code>plans</code>：一条 <code>ref_type=outing_spot</code>，一条 <code>ref_type=date_menu</code>；</li>
+    <li>安排页顶部的「这周去哪」保留，卡片可下钻到这个浮层。</li>
+  </ul>
+
+  <div class="cut">
+    <b>不做</b>
+    <p>不做地图、不做导航跳转、不做月历、不在卡片里写「离你很近」、不把笔记里的店自动塞进菜单。</p>
+  </div>
+</section>
+
+<!-- ══════════════ 7 接缝 ══════════════ -->
+<section>
+  <h2><span class="no">07</span> 接缝：动多少现有代码</h2>
+
+  <table>
+    <thead><tr><th style="width:30%">位置</th><th>改动</th></tr></thead>
+    <tbody>
+      <tr><td><code>models/place.py</code></td><td>新增，一张表</td></tr>
+      <tr><td><code>services/place.py</code></td><td>新增：<code>nearby</code> / <code>walk_minutes</code> / <code>score</code> / <code>reason</code> / <code>line</code>，约 200 行</td></tr>
+      <tr><td><code>api/place.py</code></td><td>新增 3 个端点</td></tr>
+      <tr><td><code>scripts/place_backfill.py</code></td><td>新增：把 27 家餐厅 + 12 个玩点回填成 place，写回 <code>place_id</code>，可重跑</td></tr>
+      <tr><td><code>scripts/geo_backfill.py</code></td><td>新增：补坐标（OSM 查不到的留空，人工补）</td></tr>
+      <tr><td><code>static/app.js</code></td><td>浮层加一段 nearby 渲染 + 标签切换，约 80 行</td></tr>
+      <tr><td><code>static/styles.css</code></td><td>浮层内的一组列表样式，约 40 行</td></tr>
+      <tr><td>老接口 / 老页面</td><td><b>零改动</b>（<code>/api/life/options</code>、挑餐厅页、安排页都不动）</td></tr>
+    </tbody>
+  </table>
+
+  <pre><span class="c"># 新增端点，只有三个</span>
+GET  /api/places/{place_id}/nearby?want=play&max_walk=15&amp;limit=5   <span class="c"># 核心</span>
+GET  /api/places/{place_id}                                        <span class="c"># 详情（含领域字段）</span>
+POST /api/ingest/places                                            <span class="c"># 回填 / 采集共用，按 canonical_key 幂等</span></pre>
+</section>
+
+<!-- ══════════════ 8 落地 ══════════════ -->
+<section>
+  <h2><span class="no">08</span> 落地：四步，每步都能验</h2>
+
+  <ol class="steps">
+    <li><b>建表 + 回填</b>　<code>places</code> 上线，27 + 12 个节点入库，领域表写回 <code>place_id</code>。此时老功能完全不知道它存在。</li>
+    <li><b>补坐标</b>　一次性脚本，查得到的写 <code>lng/lat</code>，查不到的留空；缺坐标的点自动降级为「同区」，不崩。</li>
+    <li><b>上线查询 + 浮层</b>　餐厅详情出现「饭后走走」，玩点详情出现「就近吃」。这一句就是 P1 的全部价值。</li>
+    <li><b>推荐线</b>　安排页顶部从 <code>line()</code> 取数，卡片下钻到浮层。</li>
+  </ol>
+
+  <h3>验收（P1）</h3>
+  <ul>
+    <li>任一餐厅详情能看到至少 1 个餐后闲逛候选，带「约 N 分钟」；</li>
+    <li>任一玩点详情能看到至少 1 个就近吃饭候选——<b>同一段代码、同一个测试</b>；</li>
+    <li>同一输入两次请求，顺序完全一致（不依赖模型、不依赖字典序随机）；</li>
+    <li>缺坐标的店不报错，降级成「同区」，卡面不写分钟；</li>
+    <li>没有候选时显示「附近没找到合适的」，不编造；</li>
+    <li><code>smoke_test.py</code> 全绿，新增 places 段落。</li>
+  </ul>
+</section>
+
+<!-- ══════════════ 9 待定 ══════════════ -->
+<section>
+  <h2><span class="no">09</span> 还剩两件要你定</h2>
+  <div class="open">
+    <ol>
+      <li><b>坐标来源</b>：V1 用 OSM 免费（省事，小馆子可能查不到，缺少的退成「同区」），还是现在去注册高德 key（准，多一步配置）？我倾向先用 OSM，把缺的记成清单，值不值得为 10 家店配 key 到时候再说。</li>
+      <li><b>节点数量</b>：现在 27 家餐厅 + 12 个玩点。图太稀，推荐会重复。要不要在 P1 顺手把玩点补到 40 个左右（从你现有的收藏和笔记里提，不用抓小红书）？</li>
+    </ol>
+  </div>
+  <p style="margin-top:18px;font-size:14px;color:#6F6255">除了这两条，这一版的其它东西我建议直接按上面的方案写代码——再往上抽象就是给几十个点的图造发动机。</p>
+</section>
+
+<div class="foot">
+  selfsec · 设计稿 v3 · 取代 v2 的边表与配方层，保留「地点是底层能力、元数据可扩展」这个判断。<br>
+  上一版：<code>docs/设计-地点拓扑-v2.md</code>；原始稿：<code>docs/设计-推荐线.md</code>
+</div>
+
+</div>
+</body>
+</html>

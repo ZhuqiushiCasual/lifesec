@@ -32,7 +32,7 @@ if not _selfsec_logger.handlers:
 import app.models  # noqa: F401 —— 注册全部模型，create_all 才能看到
 from app.api import chat, date, ingest, insights, life, memory, messages, onboarding, plans, workbench
 from app.database import Base, async_session, engine
-from app.services import fitness, outing, scheduler
+from app.services import fitness, outing, place, scheduler
 from app.services.date_menu import ensure_seed
 from app.services.deps import ensure_default_user, verify_token
 from app.services.ingest.sources import ensure_seed as ensure_ingest_sources
@@ -53,6 +53,8 @@ async def lifespan(app: FastAPI):
         await ensure_seed(db)
         await fitness.ensure_seed(db)
         await outing.ensure_seed(db)
+        # 地点拓扑：把领域表灌成 places（幂等，每次启动对齐一次；不会覆盖已补的坐标）
+        await place.sync_from_domain(db)
         await ensure_ingest_sources(db)
     task = scheduler.start()
     try:

@@ -13,7 +13,7 @@ from app.models.date_menu import DateMenuItem
 from app.models.plan import Plan
 from app.models.user import User
 from app.schemas.api import PlanCreate, PlanLifePatch, PlanOut
-from app.services import fitness, life, outing
+from app.services import fitness, life, outing, place
 from app.services.deps import get_current_user
 
 router = APIRouter(prefix="/api/life", tags=["life"])
@@ -272,3 +272,51 @@ async def get_experience(
     if data is None:
         raise HTTPException(status_code=404, detail="Experience not found")
     return data
+
+
+# ── 地点拓扑：一个查询，没有方向 ──────────────────────────────
+# 餐厅 → 闲逛、闲逛 → 餐厅，走的是同一个 nearby()，只是 want 不同。
+@router.get("/nearby")
+async def get_nearby(
+    kind: str = Query(..., pattern="^(food|outing|place)$"),
+    id: str = Query(..., max_length=64),
+    want: str = Query("stroll", pattern="^(stroll|eat|indoor)$"),
+    max_walk: int = Query(15, ge=2, le=60),
+    limit: int = Query(5, ge=1, le=20),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    anchor = await place.place_by_ref(db, kind, id)
+    if anchor is None:
+        raise HTTPException(status_code=404, detail="地点不存在")
+
+    rows = await place.nearby(db, anchor, want, max_walk=max_walk, limit=limit)
+    return {
+        "anchor": place.to_anchor(anchor),
+        "want": want,
+        "want_label": place.WANTS.get(want, place.WANTS[place.DEFAULT_WANT])["label"],
+        "max_walk": max_walk,
+        "rows": [place.to_row(anchor, row) for row in rows],
+    }
+
+
+@router.get("/places/all")
+async def list_places(
+    q: str | None = Query(None, max_length=60),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """排查用：看看拓扑里到底有什么、哪些还没坐标。"""
+    rows = await place.all_places(db, q=q)
+    return [
+        {
+            "place_id": row.id,
+            "name": row.name,
+            "branch": row.branch,
+            "category": row.category,
+            "area": row.area,
+            "geo_ok": row.has_geo,
+            "source_ref": row.source_ref,
+        }
+        for row in rows
+    ]

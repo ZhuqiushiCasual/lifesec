@@ -849,7 +849,8 @@ function openOptionDetail(kind, id) {
       ${facts ? `<div class="option-facts">${esc(facts)}</div>` : ''}
       <div class="plan-actions">
         <button class="ob-primary" data-detail-arrange="food" data-id="${esc(id)}">安排到某天</button>
-      </div>`;
+      </div>
+      <div class="near-block" data-near-kind="food" data-near-id="${esc(id)}" data-near-want="stroll"></div>`;
   } else {
     $('#exp-kicker').textContent = '出门';
     $('#exp-body').innerHTML = `
@@ -859,11 +860,80 @@ function openOptionDetail(kind, id) {
       ${(meta.tags || []).length ? `<div class="option-facts">${esc(meta.tags.join(' / '))}</div>` : ''}
       <div class="plan-actions">
         <button class="ob-primary" data-detail-arrange="outing" data-id="${esc(id)}">安排到某天</button>
-      </div>`;
+      </div>
+      <div class="near-block" data-near-kind="outing" data-near-id="${esc(id)}" data-near-want="eat"></div>`;
   }
 
   $('#experience').hidden = false;
   $('#exp-body').scrollTop = 0;
+  loadNearby();
+}
+
+/* ---------- 地点周边（一个查询，三个意图） ----------
+   后端只有一个 nearby(anchor, want)；换标签只是换 want，换锚点只是换 anchor。
+   走的到 / 打车顺路 / 没坐标 三档由后端给，前端只负责分组显示。 */
+const NEAR_WANTS = [
+  ['stroll', '饭后走走'],
+  ['eat', '就近吃'],
+  ['indoor', '雨天'],
+];
+const TIER_LABEL = { walk: '走得到', far: '打车顺路', unknown: '没坐标' };
+
+async function loadNearby() {
+  const box = $('#exp-body .near-block');
+  if (!box) return;
+  const kind = box.dataset.nearKind;
+  const id = box.dataset.nearId;
+  let want = box.dataset.nearWant || 'stroll';
+  let data = null;
+
+  const paint = () => {
+    const tabs = NEAR_WANTS.map(
+      ([k, label]) => `<button class="near-tab${k === want ? ' on' : ''}" data-near-want="${k}">${label}</button>`
+    ).join('');
+    if (!data) {
+      box.innerHTML = `<div class="near-head"><span>附近</span></div><div class="near-tabs">${tabs}</div>
+        <div class="near-empty">正在找…</div>`;
+      return;
+    }
+    const rows = data.rows || [];
+    if (!rows.length) {
+      box.innerHTML = `<div class="near-head"><span>附近</span></div><div class="near-tabs">${tabs}</div>
+        <div class="near-empty">20 分钟走得到的地方还没有收录，等图谱补点。</div>`;
+      return;
+    }
+    let lastTier = null;
+    const rowsHTML = rows
+      .map((r) => {
+        const label =
+          r.tier === 'walk' ? `走 ${r.walk_min} 分`
+          : r.tier === 'far' ? `${r.distance_km} km · 打车 ${r.drive_min} 分`
+          : '—';
+        const head = r.tier !== lastTier ? `<div class="near-tier">${TIER_LABEL[r.tier] || ''}</div>` : '';
+        lastTier = r.tier;
+        return `${head}
+          <div class="near-row${r.tier === 'unknown' ? ' dim' : ''}" data-near-goto="${esc(r.kind)}:${esc(r.id)}" data-near-name="${esc(r.name)}">
+            <span class="near-main">
+              <span class="near-name">${esc(r.name)}${r.branch ? `<span class="near-branch">${esc(r.branch)}</span>` : ''}</span>
+              <span class="near-sub">${esc(r.sub || '')}</span>
+            </span>
+            <span class="near-walk">${esc(label)}</span>
+            <button class="near-arrange" data-near-arrange="${esc(r.kind)}" data-id="${esc(r.id)}" data-name="${esc(r.name)}">安排</button>
+          </div>`;
+      })
+      .join('');
+    box.innerHTML = `<div class="near-head"><span>附近</span><span class="near-anchor">以「${esc(data.anchor.name)}」为中心</span></div>
+      <div class="near-tabs">${tabs}</div>${rowsHTML}`;
+  };
+
+  paint();
+  try {
+    data = await api(`/api/life/nearby?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}&want=${want}&limit=5`);
+  } catch (e) {
+    box.innerHTML = `<div class="near-head"><span>附近</span></div><div class="near-empty">没找到：${esc(e.message)}</div>`;
+    return;
+  }
+  paint();
 }
 
 function openSchedule(payload) {
@@ -1465,6 +1535,42 @@ document.addEventListener('keydown', (e) => {
   if (!$('#onboard').hidden) return closeOnboard();
   if (!$('#insight-modal').hidden) return closeInsight();
   if (!$('#recall-view').hidden || !$('#plan-view').hidden) closeView();
+});
+
+/* ---------- 地点周边的交互：切标签 / 换锚点 / 顺手安排 ---------- */
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('[data-near-want]');
+  if (tab) {
+    const box = tab.closest('.near-block');
+    if (box) {
+      box.dataset.nearWant = tab.dataset.nearWant;
+      loadNearby();
+    }
+    return;
+  }
+
+  const arrange = e.target.closest('[data-near-arrange]');
+  if (arrange) {
+    const kind = arrange.dataset.nearArrange;
+    const id = arrange.dataset.id;
+    const name = arrange.dataset.name || '';
+    const option = { id, name, meta: {} };
+    openSchedule(optionSchedulePayload(kind, option));
+    return;
+  }
+
+  const goto = e.target.closest('[data-near-goto]');
+  if (goto) {
+    const [kind, id] = goto.dataset.nearGoto.split(':');
+    if (!kind || !id) return;
+    // 邻居不在候选池里也要能打开：临时塞进 planOptions，详情页就能复用
+    if (!(planOptions[kind] || []).some((x) => x.id === id)) {
+      planOptions[kind] = planOptions[kind] || [];
+      planOptions[kind].push({ id, name: goto.dataset.nearName || '', subtitle: '', meta: {} });
+    }
+    openOptionDetail(kind, id);
+    return;
+  }
 });
 
 window.addEventListener('hashchange', syncView);

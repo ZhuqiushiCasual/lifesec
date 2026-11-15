@@ -535,3 +535,36 @@ body{
   .modal-body{padding:16px 16px 8px}
   .insight-modal-title{font-size:18px}
 }
+
+/* ---------- 地点周边（详情页里的 nearby 区块） ----------
+   一个查询三个意图：标签只换 want，点一行就换锚点。视觉上只用细线和文字，不加阴影。 */
+.near-block{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.near-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px}
+.near-head>span:first-child{font-size:13px;color:var(--ink2);letter-spacing:.06em}
+.near-anchor{font-family:var(--mono);font-size:10.5px;color:var(--ink3)}
+.near-tabs{display:flex;gap:6px;margin-bottom:4px}
+.near-tab{
+  font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;
+  background:transparent;color:var(--ink2);cursor:pointer;font-family:inherit;
+}
+.near-tab.on{background:var(--ink);color:#FBF7EF;border-color:var(--ink)}
+.near-tier{
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--ink3);
+  margin:10px 0 2px;
+}
+.near-row{
+  display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line2);
+}
+.near-row:last-child{border-bottom:none}
+.near-row.dim{opacity:.55}
+.near-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.near-name{font-size:14px;color:var(--ink);line-height:1.4}
+.near-branch{font-size:11px;color:var(--ink3);margin-left:5px}
+.near-sub{font-size:11.5px;color:var(--ink3);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.near-walk{font-family:var(--mono);font-size:10.5px;color:var(--ink2);flex:0 0 auto}
+.near-arrange{
+  flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--ink2);
+  font-size:11.5px;padding:3px 9px;border-radius:6px;cursor:pointer;font-family:inherit;
+}
+.near-arrange:hover{border-color:var(--line2);color:var(--ink)}
+.near-empty{font-size:12.5px;color:var(--ink3);padding:12px 0 4px;line-height:1.7}

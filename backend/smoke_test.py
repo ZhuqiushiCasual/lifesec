@@ -85,6 +85,10 @@ async def setup() -> None:
     async with async_session() as db:
         await ensure_date_menu(db)
         await ensure_ingest_sources(db)
+        # 地点拓扑：lifespan 不会跑，这里手动同步一次（幂等）
+        from app.services import outing as outing_service, place as place_service
+        await outing_service.ensure_seed(db)
+        await place_service.sync_from_domain(db)
 
 
 async def run() -> None:
@@ -864,6 +868,104 @@ async def run() -> None:
         else:
             note("未配置 DATE_ADMIN_PASSWORD", "跳过后台探店查询")
 
+
+        # ── 地点拓扑：一个 places 表 + 一个 nearby()，没有方向 ──────────
+        print("")
+        print("[地点] 拓扑与周边推荐")
+        from app.models.date_menu import DateMenuItem
+        from app.services import place as place_service
+
+        async with async_session() as db:
+            menu = (await db.execute(select(DateMenuItem))).scalars().all()
+            by_name = {m.name: m for m in menu}
+            anchor_item = by_name.get("兰桂江南")
+            neighbor_item = next((m for m in menu if m.name.startswith("野三丝")), None)
+            check("菜单里找得到测试锚点", anchor_item is not None and neighbor_item is not None)
+
+            # 给三个真实地点的坐标（湖滨一带，用来验证距离与分档）
+            coord = {
+                "兰桂江南": (30.25338, 120.15941),
+                "野三丝": (30.25682, 120.16067),
+                "南宋御街": (30.24296, 120.16701),
+            }
+            places = (await db.execute(select(place_service.Place))).scalars().all()
+            seeded = 0
+            for pl in places:
+                for key, (lat, lng) in coord.items():
+                    if pl.name.startswith(key):
+                        pl.lat, pl.lng = lat, lng
+                        seeded += 1
+                if pl.name == "灵隐寺":       # 故意不给坐标：验证降级档
+                    pl.lat = pl.lng = None
+            await db.commit()
+            check("拓扑节点已建（39 个种子地点）", len(places) >= 39, f"{len(places)} 个")
+            check("测试用坐标写入 3 个", seeded == 3, str(seeded))
+
+            anchor_place = await place_service.place_by_ref(db, "food", anchor_item.id) if anchor_item else None
+            check("领域表 id 能反查到地点", anchor_place is not None)
+
+            # ① 餐厅 → 就近吃：野三丝应该在走路档里，而且排在最前
+            rows = await place_service.nearby(db, anchor_place, "eat", limit=5)
+            names = [r["place"].name for r in rows]
+            check(
+                "餐厅 → 就近吃：走路档命中邻居",
+                any(n.startswith("野三丝") for n in names),
+                str(names[:3]),
+            )
+            check("餐厅 → 就近吃：最近的排第一", rows and rows[0]["place"].name.startswith("野三丝"), str(names[:1]))
+
+            # ② 餐厅 → 饭后走走：南宋御街应该出现（1.4 km，走路档）
+            rows_walk = await place_service.nearby(db, anchor_place, "stroll", limit=5)
+            walk_names = [r["place"].name for r in rows_walk]
+            check("餐厅 → 饭后走走：命中街区", "南宋御街" in walk_names, str(walk_names[:3]))
+
+            # ③ 对称性：玩点 → 就近吃，同一个函数、反向锚点，必须也能找到那家餐厅
+            yujie = next((p for p in places if p.name == "南宋御街"), None)
+            back = await place_service.nearby(db, yujie, "eat", limit=5) if yujie else []
+            back_names = [r["place"].name for r in back]
+            check(
+                "玩点 → 就近吃：反向也能找到同一家餐厅（没有方向）",
+                any(n.startswith("兰桂江南") for n in back_names),
+                str(back_names[:3]),
+            )
+
+            # ④ 缺坐标的降级：仍然出现，但 tier=unknown、不写分钟
+            unknowns = [r for r in rows_walk if r["walk"] is None]
+            check("没坐标的地点走降级档", bool(unknowns), f"{len(unknowns)} 个")
+            if unknowns:
+                row = place_service.to_row(anchor_place, unknowns[0])
+                check("降级行不带分钟", row["walk_min"] is None and row["tier"] == "unknown", str(row)[:120])
+
+            # ⑤ 同商场（同一个 parent）：按 2 分钟算，不按坐标算 0 米
+            a = place_service.Place(id="test-a", name="测试A", category="eat")
+            b = place_service.Place(id="test-b", name="测试B", category="shop", parent_place_id="mall")
+            a.parent_place_id = "mall"
+            a.lat, a.lng, b.lat, b.lng = 30.25, 120.16, 30.25, 120.16
+            check("同 parent 强制 2 分钟", place_service.walk_minutes(a, b) == 2, str(place_service.walk_minutes(a, b)))
+
+            # ⑥ 排序稳定：同样输入两次，顺序完全一致
+            again = await place_service.nearby(db, anchor_place, "eat", limit=5)
+            check(
+                "同输入两次顺序一致（不抖）",
+                [r["place"].id for r in again] == [r["place"].id for r in rows],
+            )
+
+        # ⑦ API：一个端点，前端只管传 kind / id / want
+        r = await c.get(
+            f"/api/life/nearby?kind=food&id={anchor_item.id}&want=stroll&limit=5"
+        )
+        check("GET /api/life/nearby 200", r.status_code == 200, r.text[:160])
+        payload = r.json()
+        check("返回 anchor + rows", bool(payload.get("anchor", {}).get("name")) and isinstance(payload.get("rows"), list))
+        check("want 默认值与标签回传", payload.get("want") == "stroll" and bool(payload.get("want_label")))
+        if payload.get("rows"):
+            first = payload["rows"][0]
+            check("行里带 kind/id，前端能复用安排流程", bool(first.get("kind")) and bool(first.get("id")))
+            check("行里带一句可读的理由", bool(first.get("reason")), first.get("reason", "")[:40])
+        r = await c.get("/api/life/nearby?kind=food&id=not-exist&want=eat")
+        check("锚点不存在返回 404", r.status_code == 404, r.text[:80])
+        r = await c.get("/api/life/nearby?kind=food&id=x&want=picnic")
+        check("非法意图被参数校验拦下", r.status_code == 422, r.text[:80])
 
 async def main() -> None:
     print(f"数据库：{settings.database_url}")

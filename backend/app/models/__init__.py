@@ -10,6 +10,7 @@ from app.models.library import TagAlias, TagIndex
 from app.models.memory import MemoryProfile, ProfileVersion
 from app.models.message import Message
 from app.models.outing_spot import OutingSpot
+from app.models.place import Place
 from app.models.plan import Plan
 from app.models.user import User
 
@@ -30,6 +31,7 @@ __all__ = [
     "Workout",
     "WorkoutSet",
     "OutingSpot",
+    "Place",
     "IngestSource",
     "IngestTask",
     "IngestRun",
