@@ -850,7 +850,7 @@ function openOptionDetail(kind, id) {
       <div class="plan-actions">
         <button class="ob-primary" data-detail-arrange="food" data-id="${esc(id)}">安排到某天</button>
       </div>
-      <div class="near-block" data-near-kind="food" data-near-id="${esc(id)}" data-near-want="stroll"></div>`;
+      <div class="near-block" data-near-kind="food" data-near-id="${esc(id)}" data-near-current="stroll"></div>`;
   } else {
     $('#exp-kicker').textContent = '出门';
     $('#exp-body').innerHTML = `
@@ -861,7 +861,7 @@ function openOptionDetail(kind, id) {
       <div class="plan-actions">
         <button class="ob-primary" data-detail-arrange="outing" data-id="${esc(id)}">安排到某天</button>
       </div>
-      <div class="near-block" data-near-kind="outing" data-near-id="${esc(id)}" data-near-want="eat"></div>`;
+      <div class="near-block" data-near-kind="outing" data-near-id="${esc(id)}" data-near-current="eat"></div>`;
   }
 
   $('#experience').hidden = false;
@@ -884,7 +884,7 @@ async function loadNearby() {
   if (!box) return;
   const kind = box.dataset.nearKind;
   const id = box.dataset.nearId;
-  let want = box.dataset.nearWant || 'stroll';
+  let want = box.dataset.nearCurrent || 'stroll';
   let data = null;
 
   const paint = () => {
@@ -1537,13 +1537,15 @@ document.addEventListener('keydown', (e) => {
   if (!$('#recall-view').hidden || !$('#plan-view').hidden) closeView();
 });
 
-/* ---------- 地点周边的交互：切标签 / 换锚点 / 顺手安排 ---------- */
+/* ---------- 地点周边的交互：切标签 / 换锚点 / 顺手安排 ----------
+   注意：块上的状态属性是 data-near-current。若沿用 data-near-want，块内每一行
+   （包括邻居行）都有这个祖先，点行会被当成点标签，永远进不了「换锚点」分支。 */
 document.addEventListener('click', (e) => {
   const tab = e.target.closest('[data-near-want]');
   if (tab) {
     const box = tab.closest('.near-block');
     if (box) {
-      box.dataset.nearWant = tab.dataset.nearWant;
+      box.dataset.nearCurrent = tab.dataset.nearWant;
       loadNearby();
     }
     return;
