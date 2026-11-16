@@ -9,7 +9,7 @@ import mimetypes
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # 静态图里的 webp：python 的 mimetypes 表在 slim 镜像里不一定带它，
@@ -90,14 +90,19 @@ app.include_router(workbench.router)
 
 @app.get("/date", include_in_schema=False)
 async def date_page():
-    """约会挑餐厅页面（给另一半看的短链接）。"""
-    return FileResponse(STATIC_DIR / "date.html")
+    """约会挑餐厅页面 —— 2026-11 已下线（不做这个页面了）。
+
+    路由留着返回 404 而不是删掉：删掉的话请求会落到下面的 StaticFiles 兜底，
+    /date 会变成静态目录列表或 301，反而容易暴露。数据（date_menu / date_photos）
+    都还在库里，真要恢复就把返回值换回 FileResponse(STATIC_DIR / "date.html")。
+    """
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
 
 
 @app.get("/date/candidates", include_in_schema=False)
 async def date_candidates_page():
-    """候选餐厅复核页：抓回来待人工过一遍的备选，数据在 static/date_candidates.json。"""
-    return FileResponse(STATIC_DIR / "date_candidates.html")
+    """候选餐厅复核页 —— 随 /date 一起下线。"""
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
 
 
 @app.get("/workbench", include_in_schema=False)
